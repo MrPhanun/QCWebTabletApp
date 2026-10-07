@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #052e22; --ink-soft: #3f6b5b; --accent-1: #059669; --accent-2: #34d399; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+    font-family: "Plus Jakarta Sans", "Noto Sans Khmer", system-ui, sans-serif; color: var(--ink);
+    background:
+      radial-gradient(60vmax 60vmax at 10% 10%, #d1fae5 0%, transparent 60%),
+      radial-gradient(60vmax 60vmax at 80% 100%, #bbf7d0 0%, transparent 60%),
+      #f7fffb;
+  }
+  .card {
+    width: 100%; max-width: 440px; padding: 32px; border-radius: 32px;
+    background: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.9);
+    box-shadow: 0 30px 80px -20px rgba(5,150,105,.35);
+  }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; }
+  .meta { margin: 16px 0 24px; display: grid; gap: 8px; font-size: 14px; color: var(--ink-soft); }
+  .meta b { color: var(--ink); }
+  .role { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #065f46; background: #d1fae5; }
+  button {
+    width: 100%; height: 50px; border: 0; border-radius: 16px; cursor: pointer;
+    background: linear-gradient(110deg, var(--accent-1), var(--accent-2));
+    color: #fff; font: 700 15px "Plus Jakarta Sans", "Noto Sans Khmer", sans-serif;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="hello">Welcome</h1>
+  <div class="meta">
+    <div>ID: <b id="uid">—</b></div>
+    <div>Role: <span class="role" id="role">—</span></div>
+  </div>
+  <button id="logout">Logout &nbsp;•&nbsp; ចាកចេញ</button>
+</div>
+<script>
+  fetch('/api/me').then(r => r.ok ? r.json() : Promise.reject()).then(u => {
+    document.getElementById('hello').textContent = `Welcome, ${u.username}`;
+    document.getElementById('uid').textContent = u.id;
+    document.getElementById('role').textContent = u.role;
+  }).catch(() => location.replace('/'));
+
+  document.getElementById('logout').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.replace('/');
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "production",
+  "host": "192.168.1.22",
+  "bindHost": "0.0.0.0",
+  "port": 6001,
+  "apiBaseUrl": "http://192.168.1.22:6001/api",
+  "showEnvBadge": false,
+  "cache": true,
+  "database": {
+    "server": "192.168.1.22",
+    "database": "QualityControlDB",
+    "user": "BRC"
+  }
+}

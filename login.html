@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #052e22;
+    --ink-soft: #3f6b5b;
+    --lilac: #6ee7b7;
+    --pink: #ffffff;
+    --peach: #bbf7d0;
+    --mint: #34d399;
+    --sky: #d1fae5;
+    --accent-1: #059669;
+    --accent-2: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+
+  body {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    overflow: hidden;
+    font-family: "Plus Jakarta Sans", "Noto Sans Khmer", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(60vmax 60vmax at 10% 10%, #d1fae5 0%, transparent 60%),
+      radial-gradient(55vmax 55vmax at 95% 15%, #ffffff 0%, transparent 60%),
+      radial-gradient(60vmax 60vmax at 80% 100%, #bbf7d0 0%, transparent 60%),
+      radial-gradient(50vmax 50vmax at 0% 100%, #ecfdf5 0%, transparent 60%),
+      #f7fffb;
+  }
+
+  /* Aurora orbs (smooth floating colour) */
+  .orb {
+    position: fixed; border-radius: 50%; pointer-events: none;
+    filter: blur(70px); opacity: .85;
+    animation: float 14s ease-in-out infinite;
+  }
+  .orb.o1 { width: 44vmax; height: 44vmax; left: -12vmax; top: -14vmax; background: var(--lilac); }
+  .orb.o2 { width: 38vmax; height: 38vmax; right: -10vmax; top: -6vmax; background: var(--pink); animation-delay: -4s; }
+  .orb.o3 { width: 42vmax; height: 42vmax; right: -12vmax; bottom: -16vmax; background: var(--mint); animation-delay: -8s; }
+  .orb.o4 { width: 32vmax; height: 32vmax; left: -8vmax; bottom: -12vmax; background: var(--peach); animation-delay: -11s; }
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(4vmax, 3vmax) scale(1.08); }
+  }
+
+  /* Fine grain for a premium, non-banded gradient */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .06; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* Glass card */
+  .card {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 440px;
+    padding: 36px 32px 30px;
+    border-radius: 36px;
+    background: linear-gradient(145deg, rgba(255,255,255,.62), rgba(255,255,255,.22));
+    border: 1px solid rgba(255,255,255,.75);
+    backdrop-filter: blur(28px) saturate(170%);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    box-shadow:
+      0 30px 80px -20px rgba(5,150,105,.35),
+      0 8px 24px rgba(52,211,153,.12),
+      inset 0 1px 0 rgba(255,255,255,.95),
+      inset 0 -1px 0 rgba(255,255,255,.3);
+    animation: rise .7s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.98); } }
+
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .avatar {
+    flex: none; width: 64px; height: 64px; border-radius: 22px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+    box-shadow: 0 10px 24px -6px rgba(5,150,105,.6), inset 0 1px 0 rgba(255,255,255,.5);
+    transform: rotate(-6deg);
+  }
+  .avatar svg { width: 36px; height: 36px; }
+  .header h1 {
+    font-size: 30px; font-weight: 800; letter-spacing: -.8px; line-height: 1.1;
+    background: linear-gradient(90deg, var(--ink), var(--accent-1));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .header p { font-size: 13px; font-weight: 500; color: var(--ink-soft); margin-top: 5px; line-height: 1.5; }
+
+  /* Fields */
+  .field {
+    display: flex; align-items: center; gap: 12px;
+    height: 56px; padding: 0 18px; margin-bottom: 14px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.6);
+    border: 1.5px solid rgba(255,255,255,.9);
+    box-shadow: 0 2px 10px rgba(5,150,105,.07), inset 0 1px 2px rgba(255,255,255,.9);
+    transition: border-color .25s, box-shadow .25s, background .25s, transform .25s;
+  }
+  .field:focus-within {
+    background: rgba(255,255,255,.88);
+    border-color: var(--accent-1);
+    box-shadow: 0 0 0 5px rgba(5,150,105,.18), 0 8px 20px -6px rgba(5,150,105,.35);
+    transform: translateY(-1px);
+  }
+  .field svg { flex: none; width: 22px; height: 22px; fill: none; stroke: var(--accent-1); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .field input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+    font: 500 16px "Plus Jakarta Sans", "Noto Sans Khmer", sans-serif; color: var(--ink);
+  }
+  .field input::placeholder { color: #7fa393; }
+  .eye { cursor: pointer; background: none; border: 0; display: grid; place-items: center; border-radius: 12px; padding: 4px; transition: background .2s; }
+  .eye:hover { background: rgba(5,150,105,.1); }
+
+  /* Button */
+  .btn {
+    position: relative; overflow: hidden;
+    width: 100%; height: 58px; margin-top: 10px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    border: 0; border-radius: 20px; cursor: pointer;
+    background: linear-gradient(110deg, var(--accent-1), var(--accent-2));
+    background-size: 160% 100%;
+    color: #fff; font: 700 16px "Plus Jakarta Sans", "Noto Sans Khmer", sans-serif; letter-spacing: .2px;
+    box-shadow: 0 16px 32px -10px rgba(5,150,105,.7), inset 0 1px 0 rgba(255,255,255,.45);
+    transition: transform .2s, box-shadow .25s, background-position .5s;
+  }
+  .btn::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.28), transparent 55%);
+  }
+  .btn:hover { background-position: 100% 0; transform: translateY(-2px); box-shadow: 0 22px 38px -10px rgba(52,211,153,.7), inset 0 1px 0 rgba(255,255,255,.45); }
+  .btn:active { transform: translateY(0) scale(.99); }
+  .btn svg { position: relative; width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+  .btn:hover svg { transform: translateX(4px); }
+  .btn span { position: relative; }
+  .btn:disabled { cursor: progress; opacity: .75; transform: none; }
+
+  /* Error message */
+  .error {
+    display: none; margin: -2px 0 12px; padding: 10px 14px; border-radius: 14px;
+    font-size: 13.5px; font-weight: 600; color: #b91c1c;
+    background: rgba(254,226,226,.75); border: 1px solid rgba(248,113,113,.45);
+  }
+  .error.show { display: block; animation: shake .35s; }
+  @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+  /* Environment badge (hidden in production) */
+  .env-badge {
+    position: fixed; top: 14px; right: 14px; z-index: 5; display: none;
+    padding: 6px 14px; border-radius: 999px;
+    font: 700 12px "Plus Jakarta Sans", sans-serif; letter-spacing: .6px; text-transform: uppercase;
+    color: #065f46; background: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.9);
+    backdrop-filter: blur(10px); box-shadow: 0 6px 16px -6px rgba(5,150,105,.4);
+  }
+  .env-badge::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #f59e0b; }
+
+  @media (max-width: 420px) {
+    .card { padding: 28px 20px 24px; border-radius: 28px; }
+    .header h1 { font-size: 25px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orb, .card { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="env-badge" id="envBadge"></div>
+<div class="orb o1"></div>
+<div class="orb o2"></div>
+<div class="orb o3"></div>
+<div class="orb o4"></div>
+
+<form class="card" id="loginForm" novalidate>
+  <div class="header">
+    <div class="avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9.500" cy="8" r="3.500"/>
+        <path d="M3 20c0-3.300 2.900-5.500 6.500-5.500"/>
+        <rect x="13.500" y="13" width="7.500" height="6.500" rx="1.800" fill="#fff" fill-opacity=".25"/>
+        <path d="M15.200 13v-1.300a2 2 0 0 1 4 0V13"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Welcome back</h1>
+      <p>សូមស្វាគមន៍ត្រឡប់មកវិញ • Sign in to continue</p>
+    </div>
+  </div>
+
+  <label class="field">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.600-7 8-7s8 3 8 7"/></svg>
+    <input type="text" id="uid" placeholder="ID or Username  •  អាយឌី" autocomplete="username" autofocus>
+  </label>
+
+  <label class="field">
+    <svg viewBox="0 0 24 24"><rect x="4" y="10.500" width="16" height="10" rx="3"/><path d="M8 10.500V8a4 4 0 0 1 8 0v2.500"/></svg>
+    <input type="password" id="pw" placeholder="Password  •  ពាក្យសម្ងាត់" autocomplete="current-password">
+    <button type="button" class="eye" aria-label="Show password" onclick="const p=document.getElementById('pw');p.type=p.type==='password'?'text':'password'">
+      <svg viewBox="0 0 24 24"><path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+  </label>
+
+  <div class="error" id="error" role="alert"></div>
+
+  <button class="btn" type="submit" id="loginBtn">
+    <span id="loginText">Login &nbsp;•&nbsp; ចូលប្រើ</span>
+    <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </button>
+</form>
+
+<script src="/config.js"></script>
+<script>
+  // Show the environment badge in non-production environments
+  if (window.APP_ENV && window.APP_ENV.showEnvBadge) {
+    const b = document.getElementById('envBadge');
+    b.textContent = window.APP_ENV.name;
+    b.style.display = 'block';
+  }
+
+  // Sign in against tbUser via the server
+  const form = document.getElementById('loginForm');
+  const errorBox = document.getElementById('error');
+  const btn = document.getElementById('loginBtn');
+  const btnText = document.getElementById('loginText');
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('show');
+    void errorBox.offsetWidth; // restart the shake animation
+    errorBox.classList.add('show');
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('uid').value.trim();
+    const password = document.getElementById('pw').value;
+    if (!id || !password) return showError('Please enter ID and password • សូមបញ្ចូលអាយឌី និងពាក្យសម្ងាត់');
+
+    btn.disabled = true;
+    btnText.textContent = 'Signing in…';
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, password })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return location.replace('/home.html');
+      showError(res.status === 401 ? 'Incorrect ID or password • អាយឌី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ' : (data.error || 'Login failed'));
+      if (res.status === 401) document.getElementById('pw').select();
+    } catch {
+      showError('Cannot reach the server');
+    }
+    btn.disabled = false;
+    btnText.innerHTML = 'Login &nbsp;•&nbsp; ចូលប្រើ';
+  });
+</script>
+</body>
+</html>

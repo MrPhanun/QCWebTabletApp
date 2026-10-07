@@ -1,0 +1,14 @@
+{
+  "name": "qc-web-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js --env=production",
+    "dev": "node server.js --env=development",
+    "start:dev": "node server.js --env=development",
+    "start:prod": "node server.js --env=production"
+  },
+  "dependencies": {
+    "mssql": "^12.7.4"
+  }
+}
