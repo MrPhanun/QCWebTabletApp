@@ -99,9 +99,11 @@ async function handleLogin(req, res) {
   }
 }
 
-const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+// URL path -> file on disk, for files whose name differs from their URL
+const aliases = { 'favicon.ico': 'QC App.ico' };
 // Only these are public; server.js, package.json and config/ are never served
-const publicFiles = new Set(['login.html', 'home.html']);
+const publicFiles = new Set(['login.html', 'home.html', 'favicon.ico']);
 
 http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
@@ -132,7 +134,7 @@ http.createServer((req, res) => {
 
   const rel = urlPath === '/' ? 'login.html' : decodeURIComponent(urlPath).replace(/^\/+/, '');
   if (!publicFiles.has(rel)) { res.writeHead(404); return res.end('Not found'); }
-  fs.readFile(path.join(__dirname, rel), (err, data) => {
+  fs.readFile(path.join(__dirname, aliases[rel] || rel), (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, {
       'Content-Type': types[path.extname(rel)] || 'application/octet-stream',
