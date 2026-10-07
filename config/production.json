@@ -10,5 +10,6 @@
     "server": "192.168.1.22",
     "database": "QualityControlDB",
     "user": "BRC"
+    
   }
 }
