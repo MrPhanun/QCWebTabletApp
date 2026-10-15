@@ -26,20 +26,25 @@ if (fs.existsSync(envFile)) {
   }
 }
 config.database.password = process.env.DB_PASSWORD;
+config.database2.password = process.env.DB2_PASSWORD;
 const PORT = process.env.PORT || config.port;
 
-// SQL Server connection pool (connects lazily, reconnects after a failure)
-let poolPromise = null;
-function getPool() {
-  if (!poolPromise) {
-    const { server, database, user, password } = config.database;
-    poolPromise = new sql.ConnectionPool({
-      server, database, user, password,
-      options: { encrypt: false, trustServerCertificate: true }
-    }).connect().catch(err => { poolPromise = null; throw err; });
-  }
-  return poolPromise;
+// SQL Server connection pools (connect lazily, reconnect after a failure)
+function makePool(dbConfig) {
+  let poolPromise = null;
+  return () => {
+    if (!poolPromise) {
+      const { server, database, user, password } = dbConfig;
+      poolPromise = new sql.ConnectionPool({
+        server, database, user, password,
+        options: { encrypt: false, trustServerCertificate: true }
+      }).connect().catch(err => { poolPromise = null; throw err; });
+    }
+    return poolPromise;
+  };
 }
+const getPool = makePool(config.database);         // QualityControlDB
+const getMarunixPool = makePool(config.database2); // Marunix (label / item master)
 
 // In-memory sessions: token -> { id, username, role, expires }
 const SESSION_HOURS = 8;
@@ -637,8 +642,8 @@ async function handleSpecLookup(req, res, session) {
   if (!itemCode || itemCode.length > 50) return sendJson(res, 400, { error: 'Give an Item Code' });
   try {
     const pool = await getPool();
-    const item = await pool.request().input('code', sql.VarChar(50), itemCode).query(
-      'SELECT TOP 1 Remark2 AS partNo FROM [Marunix].[dbo].[mstitem] WHERE ItemCode = @code');
+    const item = await (await getMarunixPool()).request().input('code', sql.VarChar(50), itemCode).query(
+      'SELECT TOP 1 Remark2 AS partNo FROM [dbo].[mstitem] WHERE ItemCode = @code');
     const bom = await pool.request().input('code', sql.VarChar(50), itemCode).query(
       `SELECT [RM Code] AS code, [RM Name] AS name, tbR.Type AS type
        FROM [RawMaterialWHDB].[dbo].[vw_GetOBSMstBOM] tbB
@@ -709,11 +714,11 @@ async function handleOqcLabel(req, res, session) {
   if (!/^[\w-]{1,50}$/.test(lot) || !/^\w{1,20}$/.test(box) || item.length > 50) return sendJson(res, 400, { error: 'Not a valid label barcode' });
   try {
     const pool = await getPool();
-    const { recordset } = await pool.request().input('lot', sql.VarChar(50), lot).input('box', sql.VarChar(20), box).query(
+    const { recordset } = await (await getMarunixPool()).request().input('lot', sql.VarChar(50), lot).input('box', sql.VarChar(20), box).query(
       `SELECT TOP 1 tbT.ItemCode AS itemCode, Remark4 AS customer, Remark2 AS partNo, RealValueQty AS qty, CustomerName AS vendor, CustomerCode AS customerCode
-       FROM [Marunix].[dbo].[prgalltransaction] tbT
-       LEFT JOIN [Marunix].[dbo].[mstitem] tbM ON tbT.ItemCode = tbM.ItemCode
-       LEFT JOIN [Marunix].[dbo].[mstcustomer] tbS ON tbM.EndUserName = tbS.CustomerCode
+       FROM [dbo].[prgalltransaction] tbT
+       LEFT JOIN [dbo].[mstitem] tbM ON tbT.ItemCode = tbM.ItemCode
+       LEFT JOIN [dbo].[mstcustomer] tbS ON tbM.EndUserName = tbS.CustomerCode
        WHERE GRICode = 30 AND tbT.TypeCode = 1 AND LotNo = @lot AND BoxNO = @box`);
     const label = recordset[0] || null;
     const dbItem = label ? String(label.itemCode ?? '').trim() : '';
