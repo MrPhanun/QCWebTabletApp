@@ -9,6 +9,8 @@
     "start:prod": "node server.js --env=production"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
     "mssql": "^12.7.4"
   }
 }
