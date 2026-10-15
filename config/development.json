@@ -10,10 +10,5 @@
     "server": "IT06-PC",
     "database": "QualityControlDB",
     "user": "PPN"
-  },
-  "database2": {
-    "server": "192.168.1.21",
-    "database": "Marunix",
-    "user": "BRC"
   }
 }
