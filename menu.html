@@ -1,0 +1,2422 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Dept App</title>
+<link rel="icon" href="/favicon.ico?v=2" type="image/x-icon">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #052e22;
+    --ink-soft: #3f6b5b;
+    --muted: #7fa393;
+    --accent-1: #059669;
+    --accent-2: #34d399;
+    --line: rgba(5,150,105,.14);
+    --glass: rgba(255,255,255,.62);
+    --sidebar-w: 300px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    height: 100vh; overflow: hidden;
+    font-family: "Plus Jakarta Sans", "Noto Sans Khmer", system-ui, sans-serif; color: var(--ink);
+    background:
+      radial-gradient(60vmax 60vmax at 0% 0%, #d1fae5 0%, transparent 60%),
+      radial-gradient(60vmax 60vmax at 100% 100%, #bbf7d0 0%, transparent 60%),
+      #f7fffb;
+    display: grid; grid-template-rows: 64px 1fr;
+  }
+  svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Top bar */
+  .topbar {
+    display: flex; align-items: center; gap: 12px; padding: 0 20px;
+    background: var(--glass); border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+    position: relative; z-index: 3;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -.3px; }
+  .brand img { width: 32px; height: 32px; border-radius: 9px; }
+  .topbar .menu-toggle { padding: 0 9px; }
+  .spacer { flex: 1; }
+  .user { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .user .avatar {
+    width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: #fff; font-weight: 800;
+  }
+  .user .name { font-weight: 700; line-height: 1.2; }
+  .user .role { font-size: 12px; color: var(--ink-soft); }
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.7);
+    color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, border-color .2s;
+  }
+  .icon-btn:hover { background: #fff; border-color: var(--accent-1); }
+  /* Button icon chip */
+  .bi {
+    display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; margin-left: -4px; border-radius: 8px;
+    background: rgba(5,150,105,.12); color: var(--accent-1); transform: rotate(-6deg); transition: transform .25s cubic-bezier(.34,1.56,.64,1), background .2s;
+  }
+  .bi svg.i { width: 14px; height: 14px; stroke-width: 2.2; }
+  button:hover:not(:disabled) .bi { transform: rotate(8deg) scale(1.12); }
+  button:active:not(:disabled) .bi { transform: rotate(0) scale(.92); }
+  .btn-primary .bi, .icon-btn.next .bi, .dlg-btn.go .bi { background: rgba(255,255,255,.24); color: #fff; }
+  .icon-btn.del .bi, .dlg.danger .dlg-btn.go .bi { background: rgba(220,38,38,.12); color: #dc2626; }
+  .dlg.danger .dlg-btn.go .bi { background: rgba(255,255,255,.24); color: #fff; }
+  .icon-btn.del:hover { border-color: #dc2626; color: #b91c1c; }
+  .row-actions .bi { width: 19px; height: 19px; border-radius: 7px; }
+  .row-actions .bi svg.i { width: 12px; height: 12px; }
+  .dlg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  @media (prefers-reduced-motion: reduce) { .bi { transition: none; } }
+  .env-badge { display: none; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #92400e; background: #fef3c7; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; grid-template-rows: minmax(0, 1fr); min-height: 0; transition: grid-template-columns .25s ease; }
+  /* Desktop: the ☰ button hides the menu so the screen gets the full width */
+  @media (min-width: 861px) {
+    body.nav-hidden .layout { grid-template-columns: 0 1fr; }
+    .sidebar { overflow: hidden; }
+    body.nav-hidden .sidebar { visibility: hidden; border-right: 0; }
+    body.nav-hidden .menu-toggle { background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); border-color: transparent; color: #fff; }
+  }
+
+  /* Sidebar + tree */
+  .sidebar {
+    display: flex; flex-direction: column; min-height: 0;
+    background: rgba(255,255,255,.45); border-right: 1px solid var(--line);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  }
+  .tree-tools { padding: 14px 14px 8px; display: grid; gap: 8px; }
+  .search {
+    display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px;
+    border-radius: 12px; background: rgba(255,255,255,.8); border: 1.5px solid rgba(255,255,255,.9);
+    color: var(--accent-1); transition: border-color .2s, box-shadow .2s;
+  }
+  .search:focus-within { border-color: var(--accent-1); box-shadow: 0 0 0 4px rgba(5,150,105,.15); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .search input::placeholder { color: var(--muted); }
+  .tree-actions { display: flex; gap: 6px; }
+  .tree-actions button { flex: 1; height: 30px; font-size: 12px; justify-content: center; }
+
+  .tree { list-style: none; overflow-y: auto; padding: 4px 10px 16px; flex: 1; }
+  .tree ul { list-style: none; position: relative; margin-left: 17px; padding-left: 8px; }
+  .tree ul::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 8px; border-left: 1.5px dashed rgba(5,150,105,.25); }
+  .tree li[aria-expanded="false"] > ul { display: none; }
+
+  .node {
+    display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 6px 8px;
+    border: 0; border-radius: 10px; background: none; cursor: pointer; text-align: left;
+    font-family: inherit; font-size: 14px; font-weight: 500; color: var(--ink); transition: background .15s, color .15s;
+  }
+  .node:hover { background: rgba(5,150,105,.08); }
+  .node:focus-visible { outline: 2px solid var(--accent-1); outline-offset: -2px; }
+  .node .chev { width: 16px; height: 16px; color: var(--muted); transition: transform .2s; }
+  .node .chev.blank { visibility: hidden; }
+  li[aria-expanded="true"] > .node .chev { transform: rotate(90deg); }
+  .node .ic { color: var(--accent-1); }
+  .node .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .node .count { font-size: 11px; font-weight: 700; color: var(--ink-soft); background: rgba(5,150,105,.1); padding: 1px 7px; border-radius: 999px; }
+  .tree > li > .node { font-weight: 700; }
+  li[aria-selected="true"] > .node { background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); color: #fff; box-shadow: 0 6px 14px -6px rgba(5,150,105,.6); }
+  li[aria-selected="true"] > .node .ic, li[aria-selected="true"] > .node .chev { color: #fff; }
+  .node mark { background: #fde68a; color: inherit; border-radius: 3px; }
+  .tree-empty { display: none; padding: 16px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  /* Content */
+  .content { overflow-y: auto; padding: 28px 32px; }
+  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
+  .crumbs .sep { color: var(--muted); }
+  .content h1 { display: flex; align-items: center; gap: 12px; font-size: 28px; font-weight: 800; letter-spacing: -.6px; margin-bottom: 20px; }
+  .content h1 .ic-wrap { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: #fff; }
+  .content h1 svg.i { width: 22px; height: 22px; }
+  .panel {
+    padding: 24px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,.8);
+    box-shadow: 0 20px 50px -24px rgba(5,150,105,.35);
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .tile {
+    display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 18px; cursor: pointer;
+    background: rgba(255,255,255,.75); border: 1px solid rgba(255,255,255,.9); text-align: left;
+    font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink);
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+  }
+  .tile:hover { transform: translateY(-2px); border-color: var(--accent-1); box-shadow: 0 12px 24px -12px rgba(5,150,105,.5); }
+  .tile .ic-wrap { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: #d1fae5; color: var(--accent-1); flex: none; }
+  .placeholder { text-align: center; padding: 48px 16px; color: var(--ink-soft); }
+  .placeholder svg.i { width: 44px; height: 44px; color: var(--accent-2); margin-bottom: 12px; }
+  .placeholder b { display: block; font-size: 17px; color: var(--ink); margin-bottom: 6px; }
+
+  /* Master-data form + table (Sampling Plan) */
+  .form-grid { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+  .fld { display: grid; gap: 6px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .5px; }
+  .fld input {
+    width: 100%; min-width: 0; height: 44px; padding: 0 14px; border-radius: 14px; border: 1.5px solid rgba(5,150,105,.2); background: rgba(255,255,255,.85);
+    font-family: inherit; font-size: 15px; font-weight: 600; color: var(--ink); outline: 0; transition: border-color .2s, box-shadow .2s;
+  }
+  .fld select {
+    width: 100%; min-width: 0; height: 44px; padding: 0 10px; border-radius: 14px; border: 1.5px solid rgba(5,150,105,.2); background: rgba(255,255,255,.85);
+    font-family: inherit; font-size: 15px; font-weight: 600; color: var(--ink); outline: 0; cursor: pointer; transition: border-color .2s, box-shadow .2s;
+  }
+  .fld input:focus, .fld select:focus { border-color: var(--accent-1); box-shadow: 0 0 0 4px rgba(5,150,105,.15); }
+  .fld input:disabled { background: rgba(5,150,105,.06); color: var(--ink-soft); cursor: not-allowed; }
+  .fld input.bad { border-color: #dc2626; box-shadow: 0 0 0 4px rgba(220,38,38,.12); }
+  .users-form { grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr) 120px 140px auto; margin-bottom: 16px; }
+  .fld input::placeholder { color: var(--muted); font-weight: 500; }
+  .seg { display: flex; height: 44px; padding: 4px; border-radius: 14px; background: rgba(5,150,105,.08); }
+  .seg button {
+    flex: 1; border: 0; border-radius: 10px; background: none; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 700; color: var(--ink-soft); transition: background .2s, color .2s;
+  }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 2px 8px rgba(5,46,34,.12); }
+  .seg button[data-level="Hard"][aria-pressed="true"] { color: #b45309; }
+  .form-actions { display: flex; gap: 8px; }
+  .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 44px; padding: 0 20px; border: 0; border-radius: 14px; cursor: pointer; white-space: nowrap;
+    background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); color: #fff;
+    font-family: inherit; font-size: 14px; font-weight: 700; box-shadow: 0 10px 20px -10px rgba(5,150,105,.7);
+  }
+  .btn-primary:disabled { opacity: .6; cursor: progress; }
+  .form-actions .icon-btn { height: 44px; border-radius: 14px; }
+  /* Status messages: soft pills with an icon badge (red = problem, green = done); hidden when empty */
+  .msg {
+    display: flex; align-items: flex-start; gap: 9px; width: fit-content; max-width: 100%; margin: 12px 0 0;
+    padding: 9px 16px 9px 10px; border-radius: 16px; font-size: 13.5px; font-weight: 600; line-height: 1.45;
+    overflow-wrap: anywhere; animation: msg-in .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .msg:empty { display: none; }
+  .msg::before {
+    flex: none; width: 21px; height: 21px; margin-top: -1px; border-radius: 8px; display: grid; place-items: center;
+    font-size: 12px; font-weight: 800; color: #fff;
+  }
+  .msg.err { color: #9f1239; background: linear-gradient(110deg, #fff1f2, #ffe4e6); border: 1px solid #fecdd3; box-shadow: 0 10px 20px -14px rgba(225,29,72,.7); }
+  .msg.err::before { content: "!"; background: linear-gradient(135deg, #e11d48, #fb7185); transform: rotate(-6deg); }
+  .msg.ok { color: #065f46; background: linear-gradient(110deg, #ecfdf5, #d1fae5); border: 1px solid #a7f3d0; box-shadow: 0 10px 20px -14px rgba(5,150,105,.7); }
+  .msg.ok::before { content: "✓"; background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); transform: rotate(-6deg); }
+  @keyframes msg-in { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
+  @media (prefers-reduced-motion: reduce) { .msg { animation: none; } }
+
+  .lvl-head { display: flex; align-items: center; gap: 10px; margin: 26px 0 10px; font-size: 16px; font-weight: 800; }
+  .lvl-pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .4px; }
+  .lvl-pill.Normal { background: #d1fae5; color: #065f46; }
+  .lvl-pill.Hard { background: #fef3c7; color: #92400e; }
+  .table-wrap { overflow-x: auto; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.75); }
+  table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.data th { text-align: left; padding: 11px 14px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); background: rgba(5,150,105,.06); white-space: nowrap; }
+  table.data td { padding: 10px 14px; border-top: 1px solid var(--line); white-space: nowrap; }
+  table.data td.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+  table.data td.meta { font-size: 12px; color: var(--ink-soft); }
+  table.data tr.editing td { background: rgba(52,211,153,.14); }
+  table.data tr.gap td { padding: 6px 14px; font-size: 12px; font-weight: 600; color: #b45309; background: rgba(254,243,199,.45); }
+  table.data .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  table.data .row-actions .icon-btn { height: 30px; padding: 0 10px; font-size: 12px; }
+  table.data .row-actions .del:hover { border-color: #dc2626; color: #b91c1c; }
+  .empty-row { padding: 18px 14px; text-align: center; color: var(--muted); font-size: 13px; }
+  .readonly-note {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px;
+    font-size: 14px; font-weight: 600; color: #92400e; background: rgba(254,243,199,.7); border: 1px solid rgba(245,158,11,.3);
+  }
+  @media (max-width: 860px) {
+    .form-grid, .users-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .panel { padding: 16px; border-radius: 20px; }
+    .form-grid .fld-level, .form-actions { grid-column: 1 / -1; }
+    .form-actions .btn-primary { flex: 1; }
+  }
+
+  /* OQC Data Information: on-screen copy of the paper OQC Inspection record (QC-RE-002) */
+  .oqc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .oqc-toolbar .msg { margin: 0 0 0 4px; }
+  .oqc-scan { width: min(100%, 320px); border-color: rgba(5,150,105,.25); }
+  .oqc-pager { display: flex; align-items: center; gap: 6px; padding: 3px; border-radius: 14px; background: rgba(5,150,105,.08); }
+  .oqc-pager .icon-btn { height: 32px; border-radius: 10px; }
+  .oqc-pager .icon-btn:disabled { opacity: .4; cursor: default; }
+  .oqc-pager .next { background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); border-color: transparent; color: #fff; font-weight: 700; }
+  .oqc-pager .next:hover { filter: brightness(1.05); }
+  .oqc-pager .del:hover { border-color: #dc2626; color: #b91c1c; }
+  .oqc-pageno { min-width: 76px; text-align: center; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  svg.i.flip { transform: rotate(180deg); }
+  .oqc-sheet-page { font-weight: 800 !important; color: var(--ink) !important; }
+  #oqcPrintPages { display: none; }
+  .oqc-save { height: 36px; padding: 0 18px; border-radius: 12px; }
+  .oqc-save:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+  .oqc-rec { padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+  .oqc-rec[data-state="new"] { background: rgba(5,150,105,.08); color: var(--ink-soft); }
+  .oqc-rec[data-state="saved"] { background: #d1fae5; color: #065f46; }
+  .oqc-rec[data-state="unsaved"], .oqc-rec[data-state="changed"] { background: #fef3c7; color: #92400e; }
+  .oqc-rec[data-state="unsaved"]::before, .oqc-rec[data-state="changed"]::before { content: "● "; }
+  .oqc-find { margin-bottom: 14px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.7); border: 1px solid var(--line); animation: msg-in .25s ease; }
+  .oqc-find-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .oqc-find-bar .search { flex: 1; min-width: 220px; max-width: 460px; border-color: rgba(5,150,105,.25); }
+  .oqc-find-bar .count { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .oqc-find-bar #oqcFindClose { margin-left: auto; }
+  .oqc-find .table-wrap { max-height: 340px; overflow: auto; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; }
+  .pill.done { background: #d1fae5; color: #065f46; }
+  .pill.draft { background: #fef3c7; color: #92400e; }
+  .pill.ok { background: #d1fae5; color: #065f46; }
+  .pill.ng { background: #fee2e2; color: #b91c1c; }
+  /* Roles & Permissions grid */
+  .perm-hint { margin: 0 0 6px; font-size: 13px; color: var(--ink-soft); }
+  .perm-wrap { max-height: calc(100vh - 330px); overflow: auto; }
+  table.perm-grid { border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 100%; }
+  table.perm-grid th, table.perm-grid td { padding: 6px 8px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.92); white-space: nowrap; }
+  table.perm-grid thead th { position: sticky; top: 0; z-index: 2; background: #f0fbf6; font-size: 12px; font-weight: 800; color: var(--ink-soft); text-align: center; }
+  table.perm-grid thead tr:nth-child(2) th { top: 33px; }
+  table.perm-grid th.grp { border-left: 2px solid rgba(5,150,105,.25); color: var(--ink); }
+  table.perm-grid th.act button { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+  table.perm-grid th.act button:hover:not(:disabled) { background: rgba(5,150,105,.12); color: var(--ink); }
+  table.perm-grid .sticky { position: sticky; left: 0; z-index: 1; text-align: left; box-shadow: 1px 0 0 var(--line); }
+  table.perm-grid thead .sticky { z-index: 3; }
+  table.perm-grid td.cb { text-align: center; }
+  table.perm-grid td.view { border-left: 2px solid rgba(5,150,105,.25); }
+  table.perm-grid td.changed { background: #fef3c7; }
+  table.perm-grid tr.me td.sticky { background: #ecfdf5; }
+  .pm-user { display: flex; align-items: center; gap: 10px; min-width: 230px; }
+  .pm-who { display: grid; line-height: 1.25; flex: 1; }
+  .pm-who small { font-size: 11px; color: var(--ink-soft); }
+  .pill.default { background: rgba(5,150,105,.08); color: var(--ink-soft); }
+  .pill.custom { background: #ede9fe; color: #5b21b6; }
+  .tick { display: inline-grid; cursor: pointer; }
+  .tick input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .tick span { width: 22px; height: 22px; border-radius: 8px; border: 2px solid rgba(5,150,105,.3); background: #fff; display: grid; place-items: center;
+    transition: background .15s, border-color .15s, transform .15s; }
+  .tick input:checked + span { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); border-color: transparent; transform: rotate(-6deg); }
+  .tick input:checked + span::after { content: "✓"; color: #fff; font-size: 13px; font-weight: 900; }
+  .tick input:focus-visible + span { box-shadow: 0 0 0 3px rgba(5,150,105,.3); }
+  .tick input:disabled + span { opacity: .55; cursor: default; }
+  .perm-save { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 12px; padding: 10px 12px;
+    border-radius: 16px; background: #fffbeb; border: 1px solid #fde68a; font-weight: 700; color: #92400e; animation: msg-in .25s ease; }
+  .perm-save span { margin-right: auto; }
+  .pill.admin { background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); color: #fff; }
+  .pill.user { background: rgba(5,150,105,.1); color: var(--ink-soft); }
+  .pill.dept { background: #e0f2fe; color: #075985; }
+  .u-name { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; }
+  .u-av { width: 28px; height: 28px; border-radius: 10px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: #fff; font-size: 13px; font-weight: 800; transform: rotate(-6deg); }
+  .oqc-sheet .missing { border-color: #f43f5e !important; background: #fff1f2 !important; box-shadow: 0 0 0 3px rgba(244,63,94,.18) !important; }
+  .oqc-prob.missing { box-shadow: 0 0 0 2px #f43f5e, 0 0 0 5px rgba(244,63,94,.18); }
+  /* SPEC master: list + editor laid out like the OQC record */
+  .spec-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 12px; }
+  .spec-bar .search { width: min(100%, 360px); border-color: rgba(5,150,105,.25); }
+  .spec-bar .count { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .spec-editor { margin-bottom: 16px; }
+  .spec-editor h3 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; }
+  .spec-editor h3 small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .spec-edit-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+  .spec-editor td.na { background: repeating-linear-gradient(135deg, #f6f8f7 0 6px, #eef2f0 6px 12px); }
+  .spec-editor td.pos { width: 30%; }
+  .spec-editor td.pos input { text-align: center; font-weight: 800; }
+  .spec-editor input.big { font-size: 15px; font-weight: 800; text-align: center; }
+  .spec-editor input:disabled, .spec-editor textarea:disabled { background: none; color: var(--ink); }
+  table.data td.txt { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  table.data tr.copying td { background: rgba(254,243,199,.6); }
+
+  .oqc-prob { height: 34px; padding: 3px; border-radius: 10px; min-width: 150px; }
+  .oqc-prob button { border-radius: 7px; font-size: 13px; }
+  .oqc-prob button[data-prob="Normal"][aria-pressed="true"] { background: var(--accent-1); color: #fff; }
+  .oqc-prob button[data-prob="Strict"][aria-pressed="true"] { background: #d97706; color: #fff; }
+  .oqc-sheet { background: #fff; border: 1.5px solid #8fb3a4; border-radius: 16px; padding: 14px; display: grid; gap: 12px; font-size: 13px; }
+  .oqc-sheet .km { display: block; font-family: "Noto Sans Khmer", "Plus Jakarta Sans", sans-serif; font-weight: 600; line-height: 1.5; }
+  .oqc-sheet .en { display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); letter-spacing: .2px; }
+  .oqc-head { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: start; }
+  .oqc-co b { display: block; font-size: 15px; font-style: italic; font-weight: 800; color: #1e3a8a; }
+  .oqc-co span { font-family: "Noto Sans Khmer", sans-serif; font-weight: 700; color: #1e3a8a; }
+  .oqc-title { text-align: center; }
+  .oqc-title .km { font-size: 22px; font-weight: 700; }
+  .oqc-title b { font-size: 17px; font-weight: 800; }
+  .oqc-ref { justify-self: end; display: grid; gap: 6px; justify-items: end; text-align: right; }
+  .oqc-ref small { font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+  .oqc-ref label { display: grid; gap: 2px; }
+  .oqc-ref input { width: 160px; }
+  table.oqc { width: 100%; border-collapse: collapse; }
+  table.oqc th, table.oqc td { border: 1px solid #b5ccc2; padding: 5px 6px; vertical-align: middle; text-align: left; }
+  table.oqc th { background: rgba(5,150,105,.06); font-weight: 600; }
+  table.oqc th.c, table.oqc td.c { text-align: center; }
+  table.oqc td.no { width: 34px; text-align: center; font-weight: 700; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  table.oqc td.rc { width: 84px; }
+  table.oqc tr.sec td { background: rgba(5,150,105,.06); }
+  .oqc-sheet input, .oqc-sheet textarea {
+    width: 100%; min-width: 0; border: 1px solid transparent; border-radius: 6px; padding: 5px 7px;
+    background: rgba(5,150,105,.05); font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink); outline: 0; resize: vertical;
+  }
+  .oqc-sheet input:focus, .oqc-sheet textarea:focus { border-color: var(--accent-1); background: #fff; box-shadow: 0 0 0 3px rgba(5,150,105,.15); }
+  .oqc-sheet textarea { margin-top: 4px; }
+  .oqc-sheet input.ng { background: #fee2e2; color: #b91c1c; }
+  .oqc-sheet select.res {
+    width: 100%; min-width: 64px; height: 32px; border: 1.5px solid rgba(5,150,105,.25); border-radius: 8px; background: #fff;
+    font-family: inherit; font-size: 13px; font-weight: 800; color: var(--ink); text-align: center; cursor: pointer;
+  }
+  .oqc-sheet select.res[data-v="OK"] { background: #d1fae5; border-color: #34d399; color: #065f46; }
+  .oqc-sheet select.res[data-v="NG"] { background: #fee2e2; border-color: #f87171; color: #b91c1c; }
+  .oqc-sheet select.res[data-v="/"] { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; }
+  .oqc-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+  .oqc-len-wrap { overflow-x: auto; }
+  .oqc-len { min-width: 500px; }
+  .oqc-len td { padding: 3px 4px; }
+  .oqc-len td.smp { width: 58px; }
+  /* ④⑤ not used: one diagonal line across the whole block (see slashUnused) */
+  .oqc-len td.smp { position: relative; }
+  .oqc-len svg.slash { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+  .oqc-len svg.slash line { stroke: #475569; stroke-width: 1.6; stroke-linecap: round; }
+  .oqc-len.slashed td.smp:nth-child(n+7) input { background: transparent; }
+  /* Row without SPEC: blank cells; the box shows again on hover/focus so it can still be typed in */
+  .oqc-len tr.nospec input.spec, .oqc-len tr.nospec input.smp, .oqc-len tr.nospec.nopos input[data-pos] { background: transparent; }
+  .oqc-len tr.nospec input:hover, .oqc-len tr.nospec input:focus { background: rgba(5,150,105,.05); }
+  .oqc-len input { text-align: center; padding: 4px 3px; font-variant-numeric: tabular-nums; }
+  .oqc-sec-title { font-weight: 700; margin-bottom: 6px; }
+  .oqc-sec-title .km, .oqc-sec-title .en { display: inline; }
+  .oqc-foot td { vertical-align: top; }
+  @media (max-width: 1100px) {
+    .oqc-cols { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 860px) {
+    .oqc-head { grid-template-columns: minmax(0, 1fr); text-align: center; }
+    .oqc-ref { justify-self: center; justify-items: center; text-align: center; }
+    .oqc-info-wrap, .oqc-foot-wrap { overflow-x: auto; }
+    .oqc-info, .oqc-foot { min-width: 640px; }
+  }
+  @media print {
+    @page { size: A4 portrait; margin: 8mm; }
+    body { display: block; height: auto; overflow: visible; background: #fff; }
+    .topbar, .sidebar, .scrim, .crumbs, .content h1, .oqc-toolbar { display: none !important; }
+    .layout { display: block; }
+    .content { overflow: visible; padding: 0; }
+    .panel { padding: 0; border: 0; box-shadow: none; background: none; }
+    .oqc-sheet { border-radius: 0; font-size: 11px; }
+    .oqc-cols { grid-template-columns: 1fr 1fr; }
+    .oqc-sheet input, .oqc-sheet textarea { background: none; resize: none; }
+    .oqc-sheet select.res { -webkit-appearance: none; appearance: none; border: 0; }
+    .oqc-prob { background: none; }
+    .oqc-prob button[aria-pressed="false"] { display: none; }
+    .oqc-prob button { box-shadow: none !important; }
+    .oqc-sheet input::placeholder { color: transparent; }
+    body.print-oqc #oqcForm, body.print-oqc .readonly-note { display: none !important; }
+    body.print-oqc #oqcPrintPages { display: block; }
+    body.print-oqc #oqcPrintPages .oqc-sheet { break-after: page; }
+    body.print-oqc #oqcPrintPages .oqc-sheet:last-child { break-after: auto; }
+    /* SPEC print: only the filled "Spec.xlsx" layout */
+    @page spec { size: A4 portrait; margin: 6mm; }
+    body.print-spec > *:not(#printArea) { display: none !important; }
+    body.print-spec #printArea { display: block; position: static; page: spec; }
+  }
+
+  /* Print layout generated from "Spec.xlsx" (spec-print.js) */
+  #printArea { display: none; }
+  #printArea.measure { display: block; position: absolute; left: -100000px; top: 0; }
+  .spt { border-collapse: collapse; table-layout: fixed; background: #fff; color: #000;
+    font-family: "Times New Roman", "Khmer OS", "Noto Sans Khmer", serif; line-height: 1.15; }
+  .spt td { padding: 0 2px; overflow: visible; white-space: pre; }
+  .spt td.v-big { font-size: 14pt; font-weight: 700; text-align: center; vertical-align: middle; white-space: normal; }
+  .spt td.v-text { font-size: 10pt; text-align: left; vertical-align: top; padding: 2px 6px; white-space: pre-wrap; word-break: break-word; }
+  .spt td.v-pos { font-size: 12pt; font-weight: 700; text-align: center; vertical-align: middle; white-space: normal; }
+  .spt td.v-spec { font-size: 11pt; text-align: center; vertical-align: middle; white-space: normal; }
+
+  /* In-app dialog (replaces the browser's confirm/alert boxes) */
+  .dlg-scrim {
+    position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px;
+    background: rgba(5,46,34,.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    opacity: 0; transition: opacity .18s ease;
+  }
+  .dlg-scrim.show { opacity: 1; }
+  .dlg {
+    width: min(100%, 400px); padding: 26px 24px 20px; border-radius: 28px; text-align: center;
+    background: linear-gradient(160deg, rgba(255,255,255,.96), rgba(240,253,247,.94));
+    border: 1px solid rgba(255,255,255,.9); box-shadow: 0 30px 70px -20px rgba(5,46,34,.45), 0 0 0 1px rgba(5,150,105,.08);
+    transform: translateY(14px) scale(.94); transition: transform .28s cubic-bezier(.34,1.56,.64,1);
+  }
+  .dlg-scrim.show .dlg { transform: none; }
+  .dlg-ic {
+    width: 64px; height: 64px; margin: -4px auto 14px; border-radius: 22px; display: grid; place-items: center; font-size: 30px;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0); box-shadow: 0 10px 24px -10px rgba(5,150,105,.6); transform: rotate(-6deg);
+  }
+  .dlg.danger .dlg-ic { background: linear-gradient(135deg, #fee2e2, #fecaca); box-shadow: 0 10px 24px -10px rgba(220,38,38,.55); }
+  .dlg.info .dlg-ic { background: linear-gradient(135deg, #fef3c7, #fde68a); box-shadow: 0 10px 24px -10px rgba(217,119,6,.5); }
+  .dlg h2 { font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; }
+  .dlg p { font-size: 14.5px; line-height: 1.5; color: var(--ink-soft); overflow-wrap: anywhere; }
+  .dlg p b { color: var(--ink); }
+  .dlg p:has(br) { text-align: left; max-height: 50vh; overflow-y: auto; }
+  .dlg-actions { display: flex; gap: 10px; margin-top: 22px; }
+  .dlg-btn {
+    flex: 1; height: 46px; border-radius: 16px; cursor: pointer; font-family: inherit; font-size: 14.5px; font-weight: 800;
+    transition: transform .15s, box-shadow .2s, background .2s;
+  }
+  .dlg-btn:active { transform: scale(.97); }
+  .dlg-btn:focus-visible { outline: 3px solid rgba(5,150,105,.35); outline-offset: 2px; }
+  .dlg-btn.ghost { background: rgba(5,150,105,.08); border: 1.5px solid transparent; color: var(--ink); }
+  .dlg-btn.ghost:hover { background: rgba(5,150,105,.14); }
+  .dlg-btn.go { border: 0; color: #fff; background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); box-shadow: 0 12px 22px -10px rgba(5,150,105,.75); }
+  .dlg.danger .dlg-btn.go { background: linear-gradient(110deg, #dc2626, #fb7185); box-shadow: 0 12px 22px -10px rgba(220,38,38,.7); }
+  .dlg.danger .dlg-btn:focus-visible { outline-color: rgba(220,38,38,.35); }
+  .dlg-btn.go:hover { box-shadow: 0 16px 26px -10px rgba(5,150,105,.85); transform: translateY(-1px); }
+  @media print { .dlg-scrim { display: none !important; } }
+
+  /* Language switch (top bar) */
+  .lang-switch { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(5,150,105,.08); }
+  .side-foot .lang-switch button { flex: 1; }
+  /* Sidebar footer: language switch + signed-in user + logout */
+  .side-foot {
+    display: grid; gap: 10px; padding: 12px 14px 14px; border-top: 1px solid var(--line);
+    background: rgba(255,255,255,.55);
+  }
+  .user-row { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 16px; background: rgba(255,255,255,.75); border: 1px solid rgba(255,255,255,.9); }
+  .user-row .user { flex: 1; min-width: 0; }
+  .user-row .meta { min-width: 0; }
+  .user-row .name, .user-row .role { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-row #logout { flex: none; }
+  .lang-switch button {
+    height: 30px; min-width: 44px; padding: 0 10px; border: 0; border-radius: 9px; background: none; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 800; color: var(--ink-soft); transition: background .2s, color .2s;
+  }
+  .lang-switch button[aria-pressed="true"] { background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); color: #fff; box-shadow: 0 6px 14px -8px rgba(5,150,105,.8); }
+  html[lang="km"] body { line-height: 1.5; }
+
+  /* Busy: a request to the server/database is running */
+  body.busy, body.busy * { cursor: wait !important; }
+  .busy-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 50; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  .busy-bar::before { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -40%;
+    background: linear-gradient(90deg, transparent, var(--accent-1), var(--accent-2), transparent); animation: busy-slide 1s ease-in-out infinite; }
+  body.busy .busy-bar { opacity: 1; }
+  @keyframes busy-slide { to { left: 100%; } }
+  .spinner { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid rgba(5,150,105,.2); border-top-color: var(--accent-1); animation: spin .7s linear infinite; display: none; }
+  body.busy .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .busy-note { display: none; font-size: 12px; font-weight: 700; color: var(--accent-1); white-space: nowrap; }
+  body.busy .busy-note { display: inline; }
+  @media print { .busy-bar { display: none; } }
+
+  .scrim { display: none; }
+
+  /* Mobile: sidebar becomes a slide-in drawer */
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed; top: 64px; bottom: 0; left: 0; width: min(86vw, var(--sidebar-w)); z-index: 2;
+      background: rgba(247,255,251,.96); transform: translateX(-100%); transition: transform .25s ease;
+    }
+    body.nav-open .sidebar { transform: none; box-shadow: 20px 0 40px -20px rgba(5,46,34,.35); }
+    body.nav-open .scrim { display: block; position: fixed; inset: 64px 0 0; z-index: 1; background: rgba(5,46,34,.2); }
+    .content { padding: 20px 16px; }
+
+    .topbar { gap: 8px; padding: 0 12px; }
+    .brand { font-size: 15px; min-width: 0; white-space: nowrap; }
+  }
+  @media (max-width: 480px) {
+    .env-badge { display: none !important; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="busy-bar" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Hide menu" title="Hide menu" aria-controls="sidebar" aria-expanded="true">
+    <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <div class="brand"><img src="/favicon.ico?v=2" alt=""> QC Dept App</div>
+  <span class="env-badge" id="envBadge"></span>
+  <div class="spacer"></div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Main menu">
+    <div class="tree-tools">
+      <label class="search">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="filter" type="search" placeholder="Search menu" data-tp="ph.menu">
+      </label>
+      <div class="tree-actions">
+        <button class="icon-btn" id="expandAll"><span class="bi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"/></svg></span><span data-t="b.expandAll">Expand all</span></button>
+        <button class="icon-btn" id="collapseAll"><span class="bi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="m7 4 5 5 5-5M7 20l5-5 5 5"/></svg></span><span data-t="b.collapseAll">Collapse all</span></button>
+      </div>
+    </div>
+    <ul class="tree" id="tree" role="tree"></ul>
+    <div class="tree-empty" id="treeEmpty" data-t="menu.empty">No menu items match.</div>
+    <!-- Bottom of the menu: language, signed-in user, logout -->
+    <div class="side-foot">
+      <div class="lang-switch" role="group" aria-label="Language / ភាសា">
+        <button type="button" data-lang="km" aria-pressed="false">ខ្មែរ</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <div class="user-row">
+        <div class="user">
+          <div class="avatar" id="avatar">?</div>
+          <div class="meta"><div class="name" id="userName">—</div><div class="role" id="userRole">—</div></div>
+        </div>
+        <button class="icon-btn" id="logout" title="Logout">
+          <span class="bi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/></svg></span>
+          <span class="logout-text" data-t="b.logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+  <div class="scrim" id="scrim"></div>
+
+  <main class="content">
+    <div class="crumbs" id="crumbs"></div>
+    <h1 id="title"></h1>
+    <div class="panel" id="panel"></div>
+  </main>
+</div>
+
+<script src="/config.js"></script>
+<script>
+  // Icons (24x24 stroke paths)
+  const ICONS = {
+    home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>',
+    clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>',
+    inbox: '<path d="M3 13h5l1 3h6l1-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+    cog: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+    alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.5"/>',
+    tool: '<path d="M14 6a4 4 0 0 0 5 5l-9 9a2 2 0 0 1-3-3l9-9a4 4 0 0 0-2-2z"/>',
+    folder: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+    box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+    tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.5.6 4 2.8 4 6"/>',
+    ruler: '<path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    file: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+    chev: '<path d="m9 6 6 6-6 6"/>',
+    save: '<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    printer: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+    pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
+    filePlus: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>',
+    fileMinus: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 14h6"/>',
+    folderOpen: '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v2"/><path d="M3 7v11a1 1 0 0 0 1 1h14l3-8H6l-3 7"/>',
+    logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
+    expand: '<path d="m7 9 5-5 5 5M7 15l5 5 5-5"/>',
+    collapse: '<path d="m7 4 5 5 5-5M7 20l5-5 5 5"/>',
+    check2: '<path d="m5 12 5 5 9-10"/>',
+    excel: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 12l4 5M13 12l-4 5"/>'
+  };
+  const svg = (name, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24">${ICONS[name] || ICONS.file}</svg>`;
+  // Button icon: a small tilted, tinted chip (wiggles on hover)
+  const ico = (name, cls = 'i') => `<span class="bi" aria-hidden="true">${svg(name, cls)}</span>`;
+  // ---- Language: app text in Khmer or English (switch in the top bar). The OQC record sheet keeps its own bilingual labels.
+  const LANG_KEY = 'qc-lang';
+  let LANG = 'km';
+  try { LANG = localStorage.getItem(LANG_KEY) || 'km'; } catch {}
+  // key: [English, Khmer]; {name} is filled from vars; {s} is the English plural "s"
+  const STR = {
+    'u.search': ['Search ID, name, role, department…', 'ស្វែងរក ID ឈ្មោះ តួនាទី ផ្នែក…'],
+    'u.id': ['ID', 'ID'], 'u.name': ['Username', 'ឈ្មោះអ្នកប្រើ'], 'u.role': ['Role', 'តួនាទី'], 'u.dept': ['Department', 'ផ្នែក'],
+    'u.created': ['Created', 'បង្កើត'], 'u.updated': ['Last updated', 'កែប្រែចុងក្រោយ'],
+    'u.count': ['{n} user{s}', 'អ្នកប្រើ {n} នាក់'], 'u.countOf': ['{n} of {total} users', '{n} ក្នុងចំណោម {total} នាក់'],
+    'u.none': ['No users match', 'រកមិនឃើញអ្នកប្រើដែលត្រូវគ្នាទេ'], 'u.noDept': ['—', '—'],
+    'u.password': ['Password', 'ពាក្យសម្ងាត់'], 'u.phId': ['e.g. 2398', 'ឧ. 2398'], 'u.phName': ['Name', 'ឈ្មោះ'], 'u.phDept': ['e.g. QC', 'ឧ. QC'],
+    'u.phPass': ['Password', 'ពាក្យសម្ងាត់'], 'u.phPassKeep': ['Leave blank to keep', 'ទុកទទេ ដើម្បីរក្សាដដែល'],
+    'u.editing': ['Editing {id} · {name}', 'កំពុងកែប្រែ {id} · {name}'],
+    'u.added': ['Added {id} · {name}', 'បានបន្ថែម {id} · {name}'], 'u.saved': ['Saved {id} · {name}', 'បានរក្សាទុក {id} · {name}'],
+    'u.deleted': ['Deleted {id} · {name}', 'បានលុប {id} · {name}'],
+    'u.delT': ['Delete this user?', 'លុបអ្នកប្រើនេះ?'],
+    'u.delM': ['<b>{id} · {name}</b> will no longer be able to log in, and their permissions are removed.', '<b>{id} · {name}</b> នឹងមិនអាចចូលប្រើបានទៀតទេ ហើយសិទ្ធិរបស់ពួកគេនឹងត្រូវលុបចោល។'],
+    'u.errId': ['ID must be 1 to 10 letters, digits, dot, dash or underscore', 'ID ត្រូវមាន 1 ដល់ 10 តួអក្សរ (អក្សរ លេខ . - _)'],
+    'u.errName': ['Enter a username', 'សូមបញ្ចូលឈ្មោះអ្នកប្រើ'], 'u.errPass': ['Enter a password', 'សូមបញ្ចូលពាក្យសម្ងាត់'],
+    'e.noPerm': ['You do not have permission to do this', 'អ្នកមិនមានសិទ្ធិធ្វើការនេះទេ'],
+    'p.view': ['View', 'មើល'], 'p.add': ['Add', 'បន្ថែម'], 'p.edit': ['Edit', 'កែប្រែ'], 'p.delete': ['Delete', 'លុប'], 'p.excel': ['Excel', 'Excel'],
+    'r.search': ['Search user…', 'ស្វែងរកអ្នកប្រើ…'], 'r.user': ['User', 'អ្នកប្រើ'],
+    'r.default': ['Default', 'លំនាំដើម'], 'r.custom': ['Custom', 'កំណត់ផ្ទាល់'], 'r.all': ['Tick / untick for everyone in the list', 'ធីក / ដោះធីក សម្រាប់អ្នកទាំងអស់ក្នុងបញ្ជី'],
+    'r.changes': ['{n} unsaved change{s}', 'មានការកែប្រែ {n} មិនទាន់រក្សាទុក'], 'r.saved': ['Permissions saved', 'បានរក្សាទុកសិទ្ធិ'],
+    'r.reset': ['Reset', 'កំណត់ឡើងវិញ'], 'r.resetT': ['Reset {name} to default?', 'កំណត់ {name} ទៅលំនាំដើមវិញ?'],
+    'r.resetM': ['Their ticks are removed and they follow the standard rules again (everyone views, QC edits, Admin manages users).', 'ការធីកទាំងអស់នឹងត្រូវដកចេញ ហើយពួកគេនឹងប្រើច្បាប់ស្តង់ដារវិញ (អ្នកទាំងអស់មើលបាន QC កែប្រែបាន Admin គ្រប់គ្រងអ្នកប្រើ)។'],
+    'r.readonly': ['View only — you cannot change permissions.', 'មើលបានតែប៉ុណ្ណោះ — អ្នកមិនអាចកែប្រែសិទ្ធិបានទេ។'],
+    'r.hint': ['Tick what each user can see (View) and which buttons they can use. Click a column title to tick it for everyone. Users marked Default follow the standard rules until you change them.', 'ធីកអ្វីដែលអ្នកប្រើម្នាក់ៗអាចមើល (មើល) និងប៊ូតុងដែលពួកគេអាចប្រើ។ ចុចចំណងជើងជួរឈរ ដើម្បីធីកសម្រាប់អ្នកទាំងអស់។ អ្នកប្រើដែលមានស្លាក លំនាំដើម ប្រើច្បាប់ស្តង់ដារ រហូតដល់អ្នកកែប្រែ។'],
+    'b.excel': ['Excel', 'Excel'], 'e.excel': ['Could not create the Excel file', 'មិនអាចបង្កើតឯកសារ Excel បានទេ'],
+    'o.excelDone': ['Downloaded {file}', 'បានទាញយក {file}'],
+    'b.save': ['Save', 'រក្សាទុក'], 'b.search': ['Search', 'ស្វែងរក'], 'b.new': ['New form', 'ទម្រង់ថ្មី'], 'b.print': ['Print', 'បោះពុម្ព'],
+    'b.addPage': ['Add page', 'បន្ថែមទំព័រ'], 'b.nextPage': ['Next page', 'ទំព័របន្ទាប់'], 'b.removePage': ['Remove page', 'លុបទំព័រ'],
+    'b.close': ['Close', 'បិទ'], 'b.open': ['Open', 'បើក'], 'b.add': ['Add', 'បន្ថែម'], 'b.edit': ['Edit', 'កែប្រែ'], 'b.copy': ['Copy', 'ចម្លង'],
+    'b.delete': ['Delete', 'លុប'], 'b.view': ['View', 'មើល'], 'b.cancel': ['Cancel', 'បោះបង់'], 'b.logout': ['Logout', 'ចាកចេញ'],
+    'b.expandAll': ['Expand all', 'ពង្រីកទាំងអស់'], 'b.collapseAll': ['Collapse all', 'បង្រួមទាំងអស់'], 'b.ok': ['OK', 'យល់ព្រម'],
+    'b.gotIt': ['Got it', 'យល់ហើយ'], 'b.keep': ['Keep it', 'ទុកវាដដែល'], 'b.remove': ['Remove', 'លុប'], 'b.continue': ['Continue', 'បន្ត'],
+    'b.stay': ['Stay here', 'នៅទីនេះ'], 'b.replace': ['Replace it', 'ជំនួសវា'], 'b.clearIt': ['Yes, clear it', 'បាទ/ចាស សម្អាតវា'],
+    'b.keepEditing': ['Keep editing', 'បន្តកែប្រែ'],
+    't.hideMenu': ['Hide menu', 'លាក់ម៉ឺនុយ'], 't.showMenu': ['Show menu', 'បង្ហាញម៉ឺនុយ'], 't.prevPage': ['Previous page', 'ទំព័រមុន'],
+    't.removeThisPage': ['Remove this page', 'លុបទំព័រនេះ'], 't.onlyQcSave': ['Only QC department users can save', 'មានតែអ្នកប្រើផ្នែក QC ប៉ុណ្ណោះដែលអាចរក្សាទុកបាន'],
+    't.language': ['Language', 'ភាសា'],
+    'ph.menu': ['Search menu', 'ស្វែងរកម៉ឺនុយ'], 'menu.empty': ['No menu items match.', 'រកមិនឃើញម៉ឺនុយដែលត្រូវគ្នាទេ។'],
+    'loading': ['Loading…', 'កំពុងផ្ទុក…'], 'notBuilt': ['This screen is not built yet.', 'អេក្រង់នេះមិនទាន់បានបង្កើតនៅឡើយទេ។'],
+    'm.dashboard': ['Dashboard', 'ផ្ទាំងគ្រប់គ្រង'], 'm.master': ['Master Data', 'ទិន្នន័យមេ'], 'm.sampling': ['OQC Inspection', 'ការត្រួតពិនិត្យ OQC'],
+    'm.spec': ['តំលៃប្រវែងកំនត់ / SPEC', 'តំលៃប្រវែងកំនត់ / SPEC'], 'm.reports': ['Reports', 'របាយការណ៍'],
+    'm.daily': ['OQC Data Information', 'ព័ត៌មានទិន្នន័យ OQC'], 'm.defect': ['Defect Analysis', 'ការវិភាគចំណុចខូច'],
+    'm.supplier': ['Supplier Quality', 'គុណភាពអ្នកផ្គត់ផ្គង់'], 'm.admin': ['Administration', 'រដ្ឋបាលប្រព័ន្ធ'],
+    'm.users': ['User Management', 'គ្រប់គ្រងអ្នកប្រើប្រាស់'], 'm.roles': ['Roles & Permissions', 'តួនាទី និងសិទ្ធិ'],
+    'e.server': ['Cannot reach the server', 'មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ'], 'e.session': ['Session expired', 'វគ្គប្រើប្រាស់បានផុតកំណត់'],
+    'e.request': ['Request failed ({status})', 'សំណើបរាជ័យ ({status})'],
+    'd.noPrintT': ["Can't print yet", 'មិនទាន់អាចបោះពុម្ពបានទេ'],
+    'd.noPrintM': ['The print template did not load. Refresh the page and try again.', 'គំរូបោះពុម្ពមិនបានផ្ទុកទេ។ សូមផ្ទុកទំព័រឡើងវិញ ហើយសាកល្បងម្តងទៀត។'],
+    // table headers / fields
+    'h.customer': ['Customer', 'អតិថិជន'], 'h.itemCode': ['Item Code', 'លេខកូដទំនិញ'], 'h.partNo': ['Part No', 'Part No'],
+    'h.wire': ['Wire', 'ខ្សែ'], 'h.terminal': ['Terminal', 'ធឺរមីណល'], 'h.housing': ['Housing', 'ហៅស៊ីង'], 'h.other': ['Other', 'ផ្សេងៗ'],
+    'h.length': ['Length', 'ប្រវែង'], 'h.lastUpdated': ['Last updated', 'កែប្រែចុងក្រោយ'], 'h.lot': ['Lot №', 'Lot №'], 'h.box': ['Box', 'Box'],
+    'h.checkDate': ['Check date', 'ថ្ងៃត្រួតពិនិត្យ'], 'h.pages': ['Pages', 'ទំព័រ'], 'h.status': ['Status', 'ស្ថានភាព'], 'h.total': ['Total', 'សរុប'],
+    'h.lastSaved': ['Last saved', 'រក្សាទុកចុងក្រោយ'],
+    // OQC Inspection ranges
+    'sp.readonly': ['View only — only QC department users can add, edit or delete ranges.', 'មើលបានតែប៉ុណ្ណោះ — មានតែអ្នកប្រើផ្នែក QC ទេដែលអាចបន្ថែម កែប្រែ ឬលុបជួរបាន។'],
+    'sp.level': ['Level', 'កម្រិត'], 'sp.ship': ['Shipment Qty', 'ចំនួនដឹកជញ្ជូន'], 'sp.inspAll': ['Inspection All Qty', 'ចំនួនត្រួតពិនិត្យសរុប'],
+    'ph.range': ['e.g. 101-150', 'ឧ. 101-150'], 'ph.qty': ['e.g. 100', 'ឧ. 100'],
+    'sp.gap': ['⚠ Gap: Shipment Qty {from}-{to} has no {level} range', '⚠ ចន្លោះ៖ ចំនួនដឹកជញ្ជូន {from}-{to} មិនមានជួរ {level} ទេ'],
+    'sp.count': ['{n} range{s}', '{n} ជួរ'], 'sp.none': ['No {level} ranges yet', 'មិនទាន់មានជួរ {level} នៅឡើយទេ'],
+    'sp.editing': ['Editing {level} {range}', 'កំពុងកែប្រែ {level} {range}'],
+    'sp.delT': ['Delete this range?', 'លុបជួរនេះ?'],
+    'sp.delM': ['<b>{level} {range}</b> → Inspection All Qty <b>{qty}</b> will be gone for good.', '<b>{level} {range}</b> → ចំនួនត្រួតពិនិត្យសរុប <b>{qty}</b> នឹងត្រូវលុបជាអចិន្ត្រៃយ៍។'],
+    'sp.deleted': ['Deleted {level} {range}', 'បានលុប {level} {range}'],
+    'sp.errRange': ['Shipment Qty must be a range like 101-150', 'ចំនួនដឹកជញ្ជូនត្រូវតែជាជួរ ដូចជា 101-150'],
+    'sp.errOrder': ['In Shipment Qty, the second number must be greater than or equal to the first', 'ក្នុងចំនួនដឹកជញ្ជូន លេខទីពីរត្រូវតែធំជាង ឬស្មើលេខទីមួយ'],
+    'sp.errQty': ['Inspection All Qty must be a whole number like 100', 'ចំនួនត្រួតពិនិត្យសរុបត្រូវតែជាចំនួនគត់ ដូចជា 100'],
+    'sp.saved': ['Saved {level} {range} → Inspection All Qty {qty}', 'បានរក្សាទុក {level} {range} → ចំនួនត្រួតពិនិត្យសរុប {qty}'],
+    'sp.added': ['Added {level} {range} → Inspection All Qty {qty}', 'បានបន្ថែម {level} {range} → ចំនួនត្រួតពិនិត្យសរុប {qty}'],
+    // SPEC
+    'sc.readonly': ['View only — only QC department users can add, edit or delete SPEC.', 'មើលបានតែប៉ុណ្ណោះ — មានតែអ្នកប្រើផ្នែក QC ទេដែលអាចបន្ថែម កែប្រែ ឬលុប SPEC បាន។'],
+    'ph.scSearch': ['Search Customer, Item Code, Part No, material, SPEC…', 'ស្វែងរក អតិថិជន លេខកូដទំនិញ Part No សម្ភារៈ SPEC…'],
+    'sc.count': ['{n} item{s}', '{n} មុខ'], 'sc.countOf': ['{n} of {total} items', '{n} ក្នុងចំណោម {total} មុខ'],
+    'sc.noMatch': ['No items match the search', 'រកមិនឃើញមុខទំនិញដែលត្រូវគ្នាទេ'], 'sc.none': ['No SPEC yet', 'មិនទាន់មាន SPEC នៅឡើយទេ'],
+    'sc.new': ['New SPEC', 'SPEC ថ្មី'], 'sc.edit': ['Edit {code}', 'កែប្រែ {code}'], 'sc.copyT': ['New SPEC (copy)', 'SPEC ថ្មី (ចម្លង)'],
+    'sc.copiedFrom': ['copied from {code} — enter the new Item Code', 'ចម្លងពី {code} — សូមបញ្ចូលលេខកូដទំនិញថ្មី'],
+    'sc.bom': ['Filled from BOM ({n} RM)', 'បានបំពេញពី BOM ({n} RM)'], 'sc.eol': ['EOL (not on this sheet): {list}', 'EOL (មិនមាននៅលើសន្លឹកនេះ)៖ {list}'],
+    'sc.unclass': ['Unclassified — check Type: {list}', 'មិនទាន់ចាត់ថ្នាក់ — សូមពិនិត្យ Type៖ {list}'],
+    'sc.delT': ['Delete this SPEC?', 'លុប SPEC នេះ?'],
+    'sc.delM': ['Item Code <b>{code}</b>{part} and all its length lines will be gone for good.', 'លេខកូដទំនិញ <b>{code}</b>{part} និងបន្ទាត់ប្រវែងទាំងអស់របស់វា នឹងត្រូវលុបជាអចិន្ត្រៃយ៍។'],
+    'sc.deleted': ['Deleted {code}', 'បានលុប {code}'], 'sc.needCode': ['Enter the Item Code', 'សូមបញ្ចូលលេខកូដទំនិញ'],
+    'sc.saved': ['Saved {code}', 'បានរក្សាទុក {code}'], 'sc.added': ['Added {code}', 'បានបន្ថែម {code}'],
+    // OQC Data Information
+    'ph.scan': ['Scan label barcode', 'ស្កេនបាកូដ'], 'ph.badge': ['Scan badge or type', 'ស្កេនកាត ឬវាយបញ្ចូល'],
+    'ph.find': ['Search Lot, Box, Item Code, Part No, Customer, Inspector…', 'ស្វែងរក Lot, Box, លេខកូដទំនិញ, Part No, អតិថិជន, អ្នកត្រួតពិនិត្យ…'],
+    'pg': ['Page {n} / {total}', 'ទំព័រ {n} / {total}'], 'st.complete': ['Complete', 'រួចរាល់'], 'st.draft': ['Draft', 'ព្រាង'],
+    'rec.count': ['{n} record{s}', '{n} កំណត់ត្រា'], 'rec.noMatch': ['No saved records match', 'រកមិនឃើញកំណត់ត្រាដែលត្រូវគ្នាទេ'],
+    'rec.none': ['No saved records yet', 'មិនទាន់មានកំណត់ត្រាដែលបានរក្សាទុកទេ'],
+    'st.new': ['New', 'ថ្មី'], 'st.newUnsaved': ['New · not saved', 'ថ្មី · មិនទាន់រក្សាទុក'], 'st.saved': ['Saved #{id}', 'បានរក្សាទុក #{id}'],
+    'st.changed': ['Saved #{id} · unsaved changes', 'បានរក្សាទុក #{id} · មានការកែប្រែមិនទាន់រក្សាទុក'],
+    'o.chooseProb': ['Choose Probability (Normal or Strict) to fill Spot Check', 'សូមជ្រើសរើស Probability (Normal ឬ Strict) ដើម្បីបំពេញ Spot Check'],
+    'o.enterQty': ['Enter Quantity to fill Spot Check', 'សូមបញ្ចូលចំនួនផលិត ដើម្បីបំពេញ Spot Check'],
+    'o.spot': ['Spot Check {n} — {prob}, Shipment Qty {range}', 'Spot Check {n} — {prob}, ចំនួនដឹកជញ្ជូន {range}'],
+    'o.noRange': ['No {prob} range covers Quantity {qty} — add one in Master Data › OQC Inspection', 'គ្មានជួរ {prob} ដែលគ្របដណ្តប់ចំនួន {qty} ទេ — សូមបន្ថែមនៅ ទិន្នន័យមេ › ការត្រួតពិនិត្យ OQC'],
+    'o.badCode': ['Hmm, "{code}" isn\'t a label code. Scan the Barcode on the label — it looks like 26-0700394/8802/4500/002', 'អូ "{code}" មិនមែនជាបាកូដទេ។ សូមស្កេន Barcode នៅលើស្លាក — វាមានទម្រង់ដូចជា 26-0700394/8802/4500/002'],
+    'o.openedSaved': ['Opened saved record — Lot {lot}, Box {box} ({state}, saved by {by} {date}). Change what you need and Save to update.', 'បានបើកកំណត់ត្រាដែលបានរក្សាទុក — Lot {lot}, Box {box} ({state}, រក្សាទុកដោយ {by} {date})។ កែប្រែតាមត្រូវការ ហើយចុច រក្សាទុក ដើម្បីធ្វើបច្ចុប្បន្នភាព។'],
+    'o.scanned': ['Scanned Lot {lot}, Box {box}, Item Code {item}', 'បានស្កេន Lot {lot}, Box {box}, លេខកូដទំនិញ {item}'],
+    'o.vendor': ['Vendor {v}', 'អ្នកលក់ {v}'], 'o.lines': ['{n} length lines', '{n} បន្ទាត់ប្រវែង'],
+    'o.noLabel': ['Lot {lot} Box {box} not found in Marunix — Customer / Part No not filled', 'រកមិនឃើញ Lot {lot} Box {box} ក្នុង Marunix — មិនបានបំពេញ អតិថិជន / Part No'],
+    'o.mismatch': ['Item Code in code ({a}) differs from Marunix ({b})', 'លេខកូដទំនិញក្នុងកូដ ({a}) ខុសពី Marunix ({b})'],
+    'o.noSpec': ['No SPEC for Item Code {item} — add it in Master Data › SPEC', 'គ្មាន SPEC សម្រាប់លេខកូដទំនិញ {item} — សូមបន្ថែមនៅ ទិន្នន័យមេ › SPEC'],
+    'o.badge': ['{field}: {name} (ID {id})', '{field}៖ {name} (ID {id})'],
+    'o.pageAdded': ['Page {n} added — copied from page {from} without the Length Check', 'បានបន្ថែមទំព័រ {n} — ចម្លងពីទំព័រ {from} ដោយគ្មានការត្រួតពិនិត្យប្រវែង'],
+    'o.removeT': ['Remove page {n}?', 'លុបទំព័រ {n}?'],
+    'o.removeM': ['Everything on this page will be removed. The other pages stay.', 'អ្វីៗទាំងអស់នៅលើទំព័រនេះនឹងត្រូវលុប។ ទំព័រផ្សេងទៀតនៅដដែល។'],
+    'o.pageRemoved': ['Page removed — {n} page{s} left', 'បានលុបទំព័រ — នៅសល់ {n} ទំព័រ'],
+    'o.lenPos': ['Length № {no}: Length Position', 'ប្រវែង № {no}៖ ទីតាំងប្រវែង'], 'o.lenSample': ['Length № {no}: sample {list}', 'ប្រវែង № {no}៖ គំរូ {list}'],
+    'o.notReadyT': ['Not ready to print yet', 'មិនទាន់រួចរាល់សម្រាប់បោះពុម្ពទេ'],
+    'o.notReadyM': ['Fill in every point first — the empty fields are outlined in red.', 'សូមបំពេញគ្រប់ចំណុចជាមុនសិន — ចំណុចដែលនៅទទេត្រូវបានគូសពណ៌ក្រហម។'],
+    'o.pageN': ['Page {n}', 'ទំព័រ {n}'], 'o.more': ['and {n} more', 'និង {n} ទៀត'],
+    'o.discardT': ['Unsaved changes', 'ការកែប្រែមិនទាន់រក្សាទុក'],
+    'o.discardM': ['This form has changes that are not saved. Leave them and continue?', 'ទម្រង់នេះមានការកែប្រែដែលមិនទាន់បានរក្សាទុក។ ទុកវាចោល ហើយបន្តឬ?'],
+    'o.onlyQc': ['Only QC department users can save OQC records', 'មានតែអ្នកប្រើផ្នែក QC ប៉ុណ្ណោះដែលអាចរក្សាទុកកំណត់ត្រា OQC បាន'],
+    'o.needLot': ['Lot № is needed to save — scan the label or type the Lot №', 'ត្រូវការ Lot № ដើម្បីរក្សាទុក — សូមស្កេនស្លាក ឬវាយ Lot №'],
+    'o.saved': ['Saved #{id} — Lot {lot}{box} · {n} page{s} · {state}', 'បានរក្សាទុក #{id} — Lot {lot}{box} · {n} ទំព័រ · {state}'],
+    'o.draftLong': ['Draft (not every point filled yet)', 'ព្រាង (មិនទាន់បំពេញគ្រប់ចំណុច)'],
+    'o.dupT': ['Already saved', 'បានរក្សាទុករួចហើយ'],
+    'o.dupM': ['{err} (record #{id}). Replace that saved record with this form?', '{err} (កំណត់ត្រា #{id})។ ជំនួសកំណត់ត្រានោះដោយទម្រង់នេះឬ?'],
+    'o.notSaved': ['Not saved — open the saved record with Search or by scanning its label to update it', 'មិនបានរក្សាទុកទេ — សូមបើកកំណត់ត្រាដែលបានរក្សាទុក តាមរយៈ ស្វែងរក ឬស្កេនស្លាករបស់វា ដើម្បីធ្វើបច្ចុប្បន្នភាព'],
+    'o.openedRec': ['Opened saved record #{id} — Lot {lot}{box} ({state}). Change what you need and Save to update.', 'បានបើកកំណត់ត្រា #{id} — Lot {lot}{box} ({state})។ កែប្រែតាមត្រូវការ ហើយចុច រក្សាទុក ដើម្បីធ្វើបច្ចុប្បន្នភាព។'],
+    'o.freshT': ['Start fresh?', 'ចាប់ផ្តើមថ្មី?'],
+    'o.freshM': ['Every page of this form will be cleared so you can start a new one.', 'គ្រប់ទំព័រនៃទម្រង់នេះនឹងត្រូវសម្អាត ដើម្បីអោយអ្នកចាប់ផ្តើមទម្រង់ថ្មី។']
+  };
+  function t(key, vars) {
+    const e = STR[key];
+    let out = e ? e[LANG === 'km' ? 1 : 0] : key;
+    if (vars) out = out.replace(/\{(\w+)\}/g, (_, k) => k === 's' && !('s' in vars) ? (Number(vars.n) === 1 ? '' : 's') : (vars[k] ?? ''));
+    return out;
+  }
+  // Static text that follows the language switch in place: T() for text, P() placeholder, TT() tooltip/label
+  const T = (key, vars) => `<span data-t="${key}"${vars ? ` data-tv="${esc(JSON.stringify(vars))}"` : ''}>${esc(t(key, vars))}</span>`;
+  const P = key => `placeholder="${esc(t(key))}" data-tp="${key}"`;
+  const TT = key => `title="${esc(t(key))}" aria-label="${esc(t(key))}" data-tt="${key}"`;
+  function applyLang(root = document) {
+    root.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t, el.dataset.tv ? JSON.parse(el.dataset.tv) : null); });
+    root.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.dataset.tp); });
+    root.querySelectorAll('[data-tt]').forEach(el => { el.title = t(el.dataset.tt); el.setAttribute('aria-label', t(el.dataset.tt)); });
+    document.documentElement.lang = LANG;
+    document.querySelectorAll('.lang-switch button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
+  }
+  // Field names used in messages (the sheet labels themselves stay as on the template)
+  const FIELD_KM = {
+    'Check date': 'ថ្ងៃត្រួតពិនិត្យ', CUSTOMER: 'អតិថិជន', 'PART №': 'ឈ្មោះផលិតផល', 'LOT №': 'លេខឡត', QUANTITY: 'ចំនួនផលិត',
+    'SPOT CHECK': 'ចំនួនចាប់ត្រួតពិនិត្យ', Probability: 'ប្រូបាបចាប់ពិនិត្យ', 'Material check': 'ត្រួតពិនិត្យវត្ថុធាតុដើម',
+    'Length Check result': 'លទ្ធផលត្រួតពិនិត្យប្រវែង', 'Total Determination': 'សរុបលទ្ធផល', 'Checked by': 'ត្រួតពិនិត្យដោយ', Inspector: 'អ្នកត្រួតពិនិត្យ'
+  };
+  const fieldName = en => LANG === 'km' ? (FIELD_KM[en] || (OQC_ITEMS.find(i => i[1] === en) || [])[0]?.replace(/^\d+\)\s*/, '') || en) : en;
+  // Server messages are English; show them in Khmer when Khmer is chosen
+  const SERVER_KM = [
+    [/^Not logged in$/, 'មិនទាន់បានចូលប្រើ'], [/^Session expired$/, 'វគ្គប្រើប្រាស់បានផុតកំណត់'], [/^Database error$/, 'បញ្ហាមូលដ្ឋានទិន្នន័យ'],
+    [/^Cannot connect to the database$/, 'មិនអាចភ្ជាប់ទៅមូលដ្ឋានទិន្នន័យបានទេ'], [/^Invalid request$/, 'សំណើមិនត្រឹមត្រូវ'],
+    [/^Only QC department users can .*$/, 'មានតែអ្នកប្រើផ្នែក QC ប៉ុណ្ណោះដែលអាចធ្វើការនេះបាន'],
+    [/^No label found for Lot (.+?), Box (.+?) and no SPEC for Item Code (.+)$/, 'រកមិនឃើញស្លាក Lot $1, Box $2 ហើយគ្មាន SPEC សម្រាប់លេខកូដទំនិញ $3'],
+    [/^No label found for Lot (.+?), Box (.+)$/, 'រកមិនឃើញស្លាក Lot $1, Box $2'],
+    [/^Not a valid label barcode$/, 'មិនមែនជាបាកូដស្លាកត្រឹមត្រូវទេ'], [/^Not a valid staff ID$/, 'ID បុគ្គលិកមិនត្រឹមត្រូវ'],
+    [/^No user with ID (.+)$/, 'រកមិនឃើញអ្នកប្រើដែលមាន ID $1'],
+    [/^Item Code (.+) already exists$/, 'លេខកូដទំនិញ $1 មានរួចហើយ'], [/^Item Code (.+) not found$/, 'រកមិនឃើញលេខកូដទំនិញ $1'],
+    [/^Item Code is required$/, 'ត្រូវការលេខកូដទំនិញ'], [/^Give an Item Code$/, 'សូមបញ្ចូលលេខកូដទំនិញ'],
+    [/^No (Normal|Strict) range covers (\d+)$/, 'គ្មានជួរ $1 ដែលគ្របដណ្តប់ $2 ទេ'],
+    [/^Overlaps the existing (\w+) range (.+)$/, 'ជាន់គ្នាជាមួយជួរ $1 ដែលមានស្រាប់ $2'],
+    [/^This (range|item|record) no longer exists$/, 'ទិន្នន័យនេះលែងមានទៀតហើយ'],
+    [/^Lot № is required to save.*$/, 'ត្រូវការ Lot № ដើម្បីរក្សាទុក — សូមស្កេនស្លាក ឬវាយ Lot №'],
+    [/^Lot (.+?)(, Box .+)? is already saved$/, 'Lot $1$2 បានរក្សាទុករួចហើយ'],
+    [/^You do not have permission to do this$/, 'អ្នកមិនមានសិទ្ធិធ្វើការនេះទេ'],
+    [/^You cannot remove your own Roles & Permissions access$/, 'អ្នកមិនអាចដកសិទ្ធិ តួនាទី និងសិទ្ធិ ពីខ្លួនឯងបានទេ'],
+    [/^At least one user must keep Roles & Permissions access$/, 'ត្រូវមានអ្នកប្រើយ៉ាងហោចណាស់ម្នាក់ ដែលនៅមានសិទ្ធិ តួនាទី និងសិទ្ធិ'],
+    [/^Only Admin users can view users$/, 'មានតែអ្នកប្រើ Admin ប៉ុណ្ណោះដែលអាចមើលអ្នកប្រើបាន'],
+    [/^ID (.+) already exists$/, 'ID $1 មានរួចហើយ'], [/^ID is required$/, 'ត្រូវការ ID'],
+    [/^ID must be 1 to 10 .*$/, 'ID ត្រូវមាន 1 ដល់ 10 តួអក្សរ (អក្សរ លេខ . - _)'],
+    [/^Username is required$/, 'ត្រូវការឈ្មោះអ្នកប្រើ'], [/^Password is required$/, 'ត្រូវការពាក្យសម្ងាត់'],
+    [/^Role must be Admin or User$/, 'តួនាទីត្រូវតែជា Admin ឬ User'],
+    [/^(Username|Department|Password) must be (\d+) characters or less$/, '$1 ត្រូវមិនលើសពី $2 តួអក្សរ'],
+    [/^You cannot delete your own user$/, 'អ្នកមិនអាចលុបអ្នកប្រើរបស់ខ្លួនឯងបានទេ'],
+    [/^This user no longer exists$/, 'អ្នកប្រើនេះលែងមានទៀតហើយ'],
+    [/^Could not create the Excel file$/, 'មិនអាចបង្កើតឯកសារ Excel បានទេ'],
+    [/^A record needs 1 to 50 pages$/, 'កំណត់ត្រាមួយត្រូវមានពី 1 ដល់ 50 ទំព័រ'], [/^This record is too large to save$/, 'កំណត់ត្រានេះធំពេកមិនអាចរក្សាទុកបាន']
+  ];
+  // Level "Hard" in the database is shown as "Strict" everywhere (same word as on the OQC record)
+  const LVL = l => l === 'Hard' ? 'Strict' : l;
+  const trServer = m => { m = m.replace(/\bHard\b/g, 'Strict'); if (LANG !== 'km') return m; for (const [re, km] of SERVER_KM) if (re.test(m)) return m.replace(re, km); return m; };
+  // The current screen re-draws its lists / counters when the language changes
+  let langHook = null;
+
+
+  // Menu tree. `roles` limits a node (and its children) to those user roles.
+  const MENU = [
+    { id: 'dashboard', k: 'm.dashboard', icon: 'home' },
+    { id: 'master', k: 'm.master', icon: 'folder', children: [
+      { id: 'sampling', k: 'm.sampling', icon: 'layers', perm: 'sampling.view' },
+      { id: 'spec', k: 'm.spec', icon: 'ruler', perm: 'spec.view' }
+    ]},
+    { id: 'reports', k: 'm.reports', icon: 'chart', children: [
+      { id: 'daily', k: 'm.daily', icon: 'calendar', perm: 'daily.view' }
+    ]},
+    { id: 'admin', k: 'm.admin', icon: 'shield', children: [
+      { id: 'users', k: 'm.users', icon: 'users', perm: 'users.view' },
+      { id: 'roles', k: 'm.roles', icon: 'lock', perm: 'roles.view' }
+    ]}
+  ];
+
+  const treeEl = document.getElementById('tree');
+  const STORE_KEY = 'qc-menu-state';
+  let nodesById = {};
+  let state = { open: ['master'], selected: 'dashboard' };
+  try { Object.assign(state, JSON.parse(localStorage.getItem(STORE_KEY)) || {}); } catch {}
+  const saveState = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} };
+
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const countLeaves = n => n.children ? n.children.reduce((a, c) => a + countLeaves(c), 0) : 1;
+
+  // Keep the pages this user may view; a group with no visible pages disappears
+  function filterByPerm(nodes) {
+    return nodes.filter(n => !n.perm || can(n.perm))
+      .map(n => n.children ? { ...n, children: filterByPerm(n.children) } : n)
+      .filter(n => !n.children || n.children.length);
+  }
+
+  function buildTree(nodes, parentEl, parent, level) {
+    for (const n of nodes) {
+      n.parent = parent;
+      nodesById[n.id] = n;
+      const li = document.createElement('li');
+      li.setAttribute('role', 'treeitem');
+      li.setAttribute('aria-level', level);
+      li.dataset.id = n.id;
+      const hasKids = !!(n.children && n.children.length);
+      if (hasKids) li.setAttribute('aria-expanded', state.open.includes(n.id));
+      li.innerHTML = `<button class="node" tabindex="-1">
+          ${svg('chev', 'i chev' + (hasKids ? '' : ' blank'))}
+          <span class="ic">${svg(n.icon)}</span>
+          <span class="label">${esc(labelOf(n))}</span>
+          ${hasKids ? `<span class="count">${countLeaves(n)}</span>` : ''}
+        </button>`;
+      n.li = li;
+      parentEl.appendChild(li);
+      if (hasKids) {
+        const ul = document.createElement('ul');
+        ul.setAttribute('role', 'group');
+        li.appendChild(ul);
+        buildTree(n.children, ul, n, level + 1);
+      }
+    }
+  }
+
+  function setExpanded(n, open) {
+    if (!n.children || !n.children.length) return;
+    n.li.setAttribute('aria-expanded', open);
+    state.open = state.open.filter(id => id !== n.id);
+    if (open) state.open.push(n.id);
+    saveState();
+  }
+
+  function pathOf(n) { const p = []; for (let x = n; x; x = x.parent) p.unshift(x); return p; }
+
+  function select(id, { focus = false } = {}) {
+    const n = nodesById[id] || nodesById.dashboard;
+    treeEl.querySelectorAll('[aria-selected="true"]').forEach(el => el.removeAttribute('aria-selected'));
+    n.li.setAttribute('aria-selected', 'true');
+    pathOf(n).slice(0, -1).forEach(a => setExpanded(a, true));
+    setRoving(n);
+    if (focus) n.li.querySelector('.node').focus();
+    state.selected = n.id;
+    saveState();
+    renderContent(n);
+    // On phones, close the drawer once a screen (not a group) is picked
+    if (!(n.children && n.children.length)) document.body.classList.remove('nav-open');
+  }
+
+  const labelOf = n => t(n.k);
+  function renderHeader(n) {
+    document.getElementById('crumbs').innerHTML = pathOf(n).map((p, i) =>
+      (i ? '<span class="sep">›</span>' : '') + `<span>${esc(labelOf(p))}</span>`).join('');
+    document.getElementById('title').innerHTML = `<span class="ic-wrap">${svg(n.icon)}</span>${esc(labelOf(n))}`;
+  }
+  function renderContent(n) {
+    renderHeader(n);
+    langHook = null;
+    const panel = document.getElementById('panel');
+    if (SCREENS[n.id]) return SCREENS[n.id](panel);
+    const items = n.id === 'dashboard' ? treeData.filter(x => x.id !== 'dashboard') : n.children;
+    if (items && items.length) {
+      panel.innerHTML = `<div class="tiles">${items.map(c =>
+        `<button class="tile" data-go="${c.id}"><span class="ic-wrap">${svg(c.icon)}</span>${T(c.k)}</button>`).join('')}</div>`;
+    } else {
+      panel.innerHTML = `<div class="placeholder">${svg(n.icon)}<b>${T(n.k)}</b>${T('notBuilt')}</div>`;
+    }
+  }
+
+  // ---- Screens: menu ids that have a real screen instead of the placeholder ----
+  const SCREENS = { sampling: renderSampling, spec: renderSpec, daily: renderOQC, users: renderUsers, roles: renderRoles };
+
+  // In-app dialog instead of the browser's confirm()/alert(). Resolves true for the main button, false otherwise.
+  // tone: 'primary' (green) | 'danger' (red, Cancel focused first) | 'info' (amber); cancel: null for a one-button notice
+  function uiDialog({ title, message, ok = t('b.ok'), cancel = t('b.cancel'), tone = 'primary', icon = '✨' }) {
+    return new Promise(resolve => {
+      const back = document.activeElement;
+      const scrim = document.createElement('div');
+      scrim.className = 'dlg-scrim';
+      scrim.innerHTML = `<div class="dlg ${tone}" role="alertdialog" aria-modal="true" aria-labelledby="dlgTitle" aria-describedby="dlgMsg">
+          <div class="dlg-ic" aria-hidden="true">${icon}</div>
+          <h2 id="dlgTitle">${esc(title)}</h2>
+          <p id="dlgMsg">${message}</p>
+          <div class="dlg-actions">
+            ${cancel ? `<button type="button" class="dlg-btn ghost" data-v="0">${esc(cancel)}</button>` : ''}
+            <button type="button" class="dlg-btn go" data-v="1">${ico(tone === 'danger' ? 'trash' : 'check2')}${esc(ok)}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(scrim);
+      const btns = [...scrim.querySelectorAll('.dlg-btn')];
+      const close = v => {
+        document.removeEventListener('keydown', onKey, true);
+        scrim.classList.remove('show');
+        setTimeout(() => scrim.remove(), 180);
+        if (back && back.focus) back.focus({ preventScroll: true });
+        resolve(v);
+      };
+      const onKey = e => {
+        if (e.key === 'Escape') { e.preventDefault(); close(false); }
+        else if (e.key === 'Tab') {   // keep focus inside the dialog
+          e.preventDefault();
+          const i = btns.indexOf(document.activeElement);
+          btns[(i + (e.shiftKey ? -1 : 1) + btns.length) % btns.length].focus();
+        }
+      };
+      document.addEventListener('keydown', onKey, true);
+      btns.forEach(b => b.onclick = () => close(b.dataset.v === '1'));
+      scrim.addEventListener('mousedown', e => { if (e.target === scrim) close(false); });
+      requestAnimationFrame(() => scrim.classList.add('show'));
+      // Risky actions start on Cancel, so Enter doesn't delete by accident
+      (tone === 'danger' && cancel ? btns[0] : btns[btns.length - 1]).focus();
+    });
+  }
+  const uiConfirm = opts => uiDialog(opts);
+  const uiAlert = opts => uiDialog({ cancel: null, tone: 'info', icon: '⚠️', ...opts });
+
+  // Permissions of the signed-in user (from /api/me); the server checks them again on every call
+  const can = k => !!(currentUser && Array.isArray(currentUser.perms) && currentUser.perms.includes(k));
+
+  // While any request runs: wait cursor + loading bar (body.busy)
+  let busyCount = 0;
+  function setBusy(on) {
+    busyCount = Math.max(0, busyCount + (on ? 1 : -1));
+    document.body.classList.toggle('busy', busyCount > 0);
+  }
+
+  async function api(method, url, body) {
+    setBusy(true);
+    try {
+      const res = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+      if (res.status === 401) { location.replace('/'); throw new Error(t('e.session')); }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(data.error ? trServer(data.error) : t('e.request', { status: res.status })), { status: res.status, data });
+      return data;
+    } catch (err) {
+      throw err instanceof TypeError ? new Error(t('e.server')) : err;
+    } finally { setBusy(false); }
+  }
+  // POST the record to /api/excel/<kind> and save the .xlsx the server returns.
+  // kind: 'oqc' -> "OQC Data.xlsx", 'spec' -> "Spec.xlsx"
+  async function downloadExcel(kind, fileName, pages) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/excel/${kind}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, itemList: OQC_ITEMS.map(i => [i[0], i[1]]), pages }) });
+      if (res.status === 401) { location.replace('/'); throw new Error(t('e.session')); }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ? trServer(data.error) : t('e.request', { status: res.status }));
+      }
+      const blob = await res.blob();
+      const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || `${fileName}.xlsx`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      return name;
+    } catch (err) {
+      throw err instanceof TypeError ? new Error(t('e.server')) : err;
+    } finally { setBusy(false); }
+  }
+  const fmtDate = d => d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+  // Sampling Plan: Level + Shipment Qty range ("101-150") -> sample Qty
+  function renderSampling(panel) {
+    let rows = [], editId = 0, level = 'Normal';
+    // Add / Edit / Delete follow Roles & Permissions (the server enforces them too)
+    const canAdd = can('sampling.add'), canEdit = can('sampling.edit'), canDel = can('sampling.delete');
+    panel.innerHTML = `
+      <div class="readonly-note" ${canAdd || canEdit || canDel ? 'hidden' : ''}>
+        ${svg('lock')} ${T('sp.readonly')}
+      </div>
+      <form class="form-grid" id="spForm" novalidate ${canAdd ? '' : 'hidden'}>
+        <div class="fld fld-level">${T('sp.level')}
+          <div class="seg" role="group" aria-label="Level">
+            <button type="button" data-level="Normal" aria-pressed="true">Normal</button>
+            <button type="button" data-level="Hard" aria-pressed="false">Strict</button>
+          </div>
+        </div>
+        <label class="fld">${T('sp.ship')} <input id="spRange" inputmode="numeric" ${P('ph.range')} autocomplete="off"></label>
+        <label class="fld">${T('sp.inspAll')} <input id="spQty" inputmode="numeric" ${P('ph.qty')} autocomplete="off"></label>
+        <div class="form-actions">
+          <button class="btn-primary" id="spSubmit" type="submit">${ico('plus')}${T('b.add')}</button>
+          <button class="icon-btn" id="spCancel" type="button" hidden>${ico('x')}${T('b.cancel')}</button>
+        </div>
+      </form>
+      <div class="msg" id="spMsg" role="status"></div>
+      <div id="spTables"></div>`;
+
+    const $ = id => panel.querySelector('#' + id);
+    const msg = (text, kind = 'err') => { $('spMsg').textContent = text; $('spMsg').className = 'msg ' + kind; };
+    const setLevel = l => {
+      level = l;
+      panel.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.level === l));
+    };
+    panel.querySelectorAll('.seg button').forEach(b => b.onclick = () => setLevel(b.dataset.level));
+
+    function resetForm() {
+      editId = 0;
+      $('spForm').reset();
+      $('spSubmit').innerHTML = ico('plus') + T('b.add');
+      $('spCancel').hidden = true;
+      $('spForm').hidden = !canAdd;
+      panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+      drawTables();
+    }
+    $('spCancel').onclick = () => { resetForm(); msg(''); };
+
+    function drawTables() {
+      $('spTables').innerHTML = ['Normal', 'Hard'].map(l => {
+        const list = rows.filter(r => r.level === l).sort((a, b) => a.qtyFrom - b.qtyFrom);
+        let body = '';
+        list.forEach((r, i) => {
+          const prev = list[i - 1];
+          if (prev && r.qtyFrom > prev.qtyTo + 1) {
+            body += `<tr class="gap"><td colspan="4">${esc(t('sp.gap', { from: prev.qtyTo + 1, to: r.qtyFrom - 1, level: LVL(l) }))}</td></tr>`;
+          }
+          body += `<tr class="${r.id === editId ? 'editing' : ''}">
+            <td class="num">${r.qtyFrom}-${r.qtyTo}</td>
+            <td class="num">${r.sampleQty}</td>
+            <td class="meta">${esc(String(r.updateBy || ''))} · ${fmtDate(r.updateDate)}</td>
+            <td>${canEdit || canDel ? `<div class="row-actions">
+              ${canEdit ? `<button class="icon-btn" data-edit="${r.id}">${ico('pencil')}${T('b.edit')}</button>` : ''}
+              ${canDel ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}
+            </div>` : ''}</td></tr>`;
+        });
+        return `<div class="lvl-head"><span class="lvl-pill ${l}">${LVL(l)}</span>${esc(t('sp.count', { n: list.length }))}</div>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>${T('sp.ship')}</th><th>${T('sp.inspAll')}</th><th>${T('h.lastUpdated')}</th><th></th></tr></thead>
+            <tbody>${body || `<tr><td colspan="4" class="empty-row">${esc(t('sp.none', { level: LVL(l) }))}</td></tr>`}</tbody>
+          </table></div>`;
+      }).join('');
+    }
+
+    async function load() {
+      try { rows = await api('GET', '/api/sampling'); drawTables(); }
+      catch (e) { msg(e.message); }
+    }
+
+    $('spTables').onclick = async e => {
+      const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
+      if (ed) {
+        $('spForm').hidden = false;
+        const r = rows.find(x => x.id === Number(ed.dataset.edit));
+        editId = r.id;
+        setLevel(r.level);
+        $('spRange').value = `${r.qtyFrom}-${r.qtyTo}`;
+        $('spQty').value = r.sampleQty;
+        $('spSubmit').innerHTML = ico('save') + T('b.save');
+        $('spCancel').hidden = false;
+        msg(t('sp.editing', { level: LVL(r.level), range: `${r.qtyFrom}-${r.qtyTo}` }), 'ok');
+        drawTables();
+        $('spRange').focus();
+      }
+      if (del) {
+        const r = rows.find(x => x.id === Number(del.dataset.del));
+        if (!await uiConfirm({ tone: 'danger', icon: '🗑️', title: t('sp.delT'),
+          message: t('sp.delM', { level: LVL(r.level), range: `${r.qtyFrom}-${r.qtyTo}`, qty: r.sampleQty }),
+          ok: t('b.delete'), cancel: t('b.keep') })) return;
+        try {
+          await api('DELETE', `/api/sampling/${r.id}`);
+          if (editId === r.id) resetForm();
+          msg(t('sp.deleted', { level: LVL(r.level), range: `${r.qtyFrom}-${r.qtyTo}` }), 'ok');
+          await load();
+        } catch (err) { msg(err.message); }
+      }
+    };
+
+    $('spForm').onsubmit = async e => {
+      e.preventDefault();
+      panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+      const m = $('spRange').value.match(/^\s*(\d+)\s*[-–~]\s*(\d+)\s*$/);
+      const qty = $('spQty').value.trim();
+      if (!m) { $('spRange').classList.add('bad'); $('spRange').focus(); return msg(t('sp.errRange')); }
+      const from = Number(m[1]), to = Number(m[2]);
+      if (to < from) { $('spRange').classList.add('bad'); $('spRange').focus(); return msg(t('sp.errOrder')); }
+      if (!/^\d+$/.test(qty) || Number(qty) < 1) { $('spQty').classList.add('bad'); $('spQty').focus(); return msg(t('sp.errQty')); }
+
+      $('spSubmit').disabled = true;
+      try {
+        const body = { level, qtyFrom: from, qtyTo: to, sampleQty: Number(qty) };
+        if (editId) await api('PUT', `/api/sampling/${editId}`, body);
+        else await api('POST', '/api/sampling', body);
+        msg(t(editId ? 'sp.saved' : 'sp.added', { level: LVL(level), range: `${from}-${to}`, qty }), 'ok');
+        const keepLevel = level;
+        resetForm(); setLevel(keepLevel);
+        await load();
+        $('spRange').focus();
+      } catch (err) {
+        if (/overlap/i.test(err.message)) $('spRange').classList.add('bad');
+        msg(err.message);
+      } finally { $('spSubmit').disabled = false; }
+    };
+
+    langHook = drawTables;
+    load();
+  }
+
+  // Shared by the OQC record (OQC Data Information) and the SPEC master, which is laid out like it
+  const bi = (km, en) => `<span class="km">${km}</span><span class="en">[${en}]</span>`;
+  const OQC_CIRC = ['①', '②', '③', '④', '⑤'];
+  const OQC_INFO = [
+    ['ឈ្មោះអតិថិជន', 'CUSTOMER', 'oqcCustomer'], ['ឈ្មោះផលិតផល', 'PART №', 'oqcPart'], ['លេខឡត', 'LOT №', 'oqcLot'],
+    ['ចំនួនផលិត', 'QUANTITY', 'oqcQty'], ['ចំនួនចាប់ត្រួតពិនិត្យ', 'SPOT CHECK', 'oqcSpot'], ['ប្រូបាបចាប់ពិនិត្យ', 'Probability', 'oqcProb']
+  ];
+  const OQC_MATERIAL = [['①', 'ខ្សែ', 'Wire'], ['②', 'ធីរមីណល', 'Terminal'], ['③', 'ហៅស៊ីង', 'Housing'], ['④', 'ផ្សេងៗ', 'Other']];
+  const OQC_ITEMS = [
+    // [Khmer, English, default result] — "/" means not applicable
+    ['3) ឆ្លងកាត់តេស្តចរន្ត', 'CONDUCTIVITY TEST', 'OK'],
+    ['4) លក្ខណៈការបញ្ចូលខ្សែ', "WIRE ASS'Y CONDITION", 'OK'],
+    ['5) លក្ខណៈការដោតចូល', 'INSERTION CONDITION', 'OK'],
+    ['6) លក្ខណៈគៀប', 'CRIMPING CONDITION', 'OK'],
+    ['7) លក្ខណៈសង្កត់', 'PRESSING CONDITION', 'OK'],
+    ['8) លក្ខណៈចងខ្សែ', 'TIE CABLE CONDITION', 'OK'],
+    ['9) លក្ខណៈផ្សារសំណ', 'SOLDERING CONDITION', 'OK'],
+    ['10) ត្រួតពិនិត្យសោភ័ណភាព', 'APPEARANCE CHECK', 'OK'],
+    ['11) ត្រួតពិនិត្យបរិស្ថាន (RoHS)', 'RoHS ENVIRONMENTAL CONSERVATION CHECK', 'OK']
+  ];
+  const oqcHead = right => `<div class="oqc-head">
+      <div class="oqc-co"><b>MARUNIX(CAMBODIA)Co.,Ltd</b><span>ម៉ារូនិក(ខេមបូឌា)</span></div>
+      <div class="oqc-title"><span class="km">តារាងត្រួតពិនិត្យផលិតផល</span><b>[OQC Inspection record]</b></div>
+      <div class="oqc-ref"><small>REF: QC-RE-002 &nbsp;REV:02 &nbsp;Date: 01/04/2026</small>${right}</div>
+    </div>`;
+
+  // SPEC master: per ItemCode the material check text (Wire / Terminal / Housing / Other)
+  // and up to 22 Length Position + SPEC rows, edited in the same layout as the OQC record
+  function renderSpec(panel) {
+    const canAdd = can('spec.add'), canEdit = can('spec.edit'), canDel = can('spec.delete'), canExcel = can('spec.excel');
+    // [field, №, Khmer, English] for 1) MATERIAL CHECK
+    const MATERIAL = [['wire', '①', 'ខ្សែ', 'Wire'], ['terminal', '②', 'ធឺរមីណល', 'Terminal'], ['housing', '③', 'ហៅស៊ីង', 'Housing'], ['other', '④', 'ផ្សេងៗ', 'Other']];
+    let rows = [], editId = 0, mode = '';   // mode: '' (closed) | 'new' | 'edit' | 'copy' | 'view'
+    // OQC record info row with an Item Code column after Customer
+    const INFO = [OQC_INFO[0], ['', 'Item Code'], ...OQC_INFO.slice(1)];
+    // Cells that are only filled in during an inspection show as greyed blanks
+    const na = (attrs = '') => `<td class="na" ${attrs}></td>`;
+
+    const lenTable = from => `<table class="oqc oqc-len">
+        <thead>
+          <tr><th class="c" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
+            <th rowspan="2">${bi('តំលៃប្រវែងកំនត់', 'SPEC')}</th><th class="c" colspan="5">Sample</th></tr>
+          <tr>${OQC_CIRC.map(c => `<th class="c">${c}</th>`).join('')}</tr>
+        </thead>
+        <tbody>${Array.from({ length: 11 }, (_, k) => from + k).map(i => `<tr>
+          <td class="no">${i}</td>
+          <td class="pos"><input data-pos="${i}" maxlength="50" aria-label="Length position ${i}"></td>
+          <td class="spc"><input data-spec="${i}" maxlength="50" aria-label="SPEC ${i}" placeholder="20±5"></td>
+          ${OQC_CIRC.map(() => na()).join('')}</tr>`).join('')}
+          <tr class="sec"><td colspan="3">${bi('លទ្ធផល', 'Result')}</td>${na('colspan="5"')}</tr>
+        </tbody></table>`;
+
+    panel.innerHTML = `
+      <div class="readonly-note" ${canAdd || canEdit || canDel ? 'hidden' : ''}>${svg('lock')} ${T('sc.readonly')}</div>
+      <div class="msg" id="scMsg" role="status"></div>
+      <form class="oqc-sheet spec-editor" id="scForm" novalidate autocomplete="off" hidden>
+        <div class="spec-edit-bar">
+          <h3><span id="scTitle"></span><small id="scSub"></small></h3>
+          <div class="form-actions">
+            <button class="icon-btn" id="scPrint" type="button">${ico('excel')}${T('b.excel')}</button>
+            <button class="icon-btn" id="scCancel" type="button">${ico('x')}${T('b.cancel')}</button>
+            <button class="btn-primary" id="scSave" type="submit">${ico('save')}${T('b.save')}</button>
+          </div>
+        </div>
+        ${oqcHead(`<span>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}</span>`)}
+
+        <div class="oqc-info-wrap"><table class="oqc oqc-info">
+          <tr>${INFO.map(([km, en]) => `<th class="c">${km ? bi(km, en) : en}</th>`).join('')}</tr>
+          <tr>${INFO.map(([, en]) => en === 'CUSTOMER'
+            ? `<td><input id="scCustomer" class="big" maxlength="100" aria-label="Customer"></td>`
+            : en === 'Item Code' ? `<td><input id="scItem" class="big" maxlength="50" aria-label="Item Code" placeholder="FM4-H915-000"></td>`
+            : en === 'PART №' ? `<td><input id="scPart" class="big" maxlength="100" aria-label="Part No"></td>` : na()).join('')}</tr>
+        </table></div>
+
+        <div class="oqc-cols">
+          <table class="oqc">
+            <tr><th>${bi('ប្រការត្រូវពិនិត្យ', 'INSPECTION ITEM')}</th><th class="c">${bi('លទ្ធផល', 'Result')}</th></tr>
+            <tr class="sec"><td>${bi('1) ត្រួតពិនិត្យវត្ថុធាតុដើម', 'MATERIAL CHECK')}</td>${na()}</tr>
+            ${MATERIAL.map(([k, n, km, en]) => `<tr><td colspan="2">
+              <div class="oqc-sec-title">${n} <span class="km">${km}</span> <span class="en">[${en}]</span></div>
+              <textarea id="sc-${k}" rows="2" maxlength="1000" aria-label="${en}"></textarea></td></tr>`).join('')}
+          </table>
+          <table class="oqc">
+            <tr><th>${bi('ប្រការត្រូវពិនិត្យ', 'INSPECTION ITEM')}</th><th class="c">${bi('លទ្ធផល', 'Result')}</th></tr>
+            ${OQC_ITEMS.map(([km, en]) => `<tr><td>${bi(km, en)}</td>${na()}</tr>`).join('')}
+          </table>
+        </div>
+
+        <div>
+          <div class="oqc-sec-title"><span class="km">2) ត្រួតពិនិត្យប្រវែង</span> <span class="en">[Length Check]</span></div>
+          <div class="oqc-cols">
+            <div class="oqc-len-wrap">${lenTable(1)}</div>
+            <div class="oqc-len-wrap">${lenTable(12)}</div>
+          </div>
+        </div>
+
+        <div class="oqc-foot-wrap"><table class="oqc oqc-foot">
+          <tr>
+            <td rowspan="2" style="width:52%">${bi('កំនត់សំគាល់', 'Remarks')}</td>
+            <th class="c">${bi('អនុម័តដោយ', 'Approved by')}</th>
+            <th class="c">${bi('ត្រួតពិនិត្យដោយ', 'Checked by')}</th>
+            <th class="c">${bi('អ្នកត្រួតពិនិត្យ', 'Inspector')}</th>
+          </tr>
+          <tr>${na()}${na()}${na()}</tr>
+        </table></div>
+      </form>
+      <div class="spec-bar">
+        <label class="search">${svg('list')}<input id="scSearch" type="search" ${P('ph.scSearch')} aria-label="Search SPEC"></label>
+        ${canAdd ? `<button class="btn-primary" id="scAdd" type="button">${ico('plus')}${T('b.add')}</button>` : ''}
+        <span class="count" id="scCount"></span>
+        <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
+      </div>
+      <div class="table-wrap spec-list"><table class="data">
+        <thead><tr>${['h.customer', 'h.itemCode', 'h.partNo', 'h.wire', 'h.terminal', 'h.housing', 'h.other', 'h.length', 'h.lastUpdated'].map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
+        <tbody id="scBody"></tbody>
+      </table></div>`;
+
+    const $ = id => panel.querySelector('#' + id);
+    const msg = (text, kind = 'err') => { $('scMsg').textContent = text; $('scMsg').className = 'msg ' + kind; };
+    const s = v => esc(String(v ?? ''));
+
+    function drawList() {
+      const q = $('scSearch').value.trim().toLowerCase();
+      const hit = r => !q || [r.itemCode, r.customer, r.partNo, r.wire, r.terminal, r.housing, r.other, ...r.lengths.flatMap(l => [l.position, l.spec])]
+        .some(v => String(v || '').toLowerCase().includes(q));
+      const list = rows.filter(hit);
+      $('scCount').textContent = q ? t('sc.countOf', { n: list.length, total: rows.length }) : t('sc.count', { n: rows.length });
+      $('scBody').innerHTML = list.map(r => `<tr class="${r.id === editId && mode === 'edit' ? 'editing' : r.id === editId && mode === 'copy' ? 'copying' : ''}">
+          <td>${s(r.customer)}</td>
+          <td class="num">${s(r.itemCode)}</td>
+          <td>${s(r.partNo)}</td>
+          ${['wire', 'terminal', 'housing', 'other'].map(k => `<td class="txt" title="${s(r[k])}">${s(r[k])}</td>`).join('')}
+          <td class="num">${r.lengths.length}</td>
+          <td class="meta">${s(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
+          <td><div class="row-actions">
+            <button class="icon-btn" data-act="view" data-id="${r.id}">${ico('eye')}${T('b.view')}</button>
+            ${canExcel ? `<button class="icon-btn" data-act="print" data-id="${r.id}">${ico('excel')}${T('b.excel')}</button>` : ''}
+            ${canEdit ? `<button class="icon-btn" data-act="edit" data-id="${r.id}">${ico('pencil')}${T('b.edit')}</button>` : ''}
+            ${canAdd ? `<button class="icon-btn" data-act="copy" data-id="${r.id}">${ico('copy')}${T('b.copy')}</button>` : ''}
+            ${canDel ? `<button class="icon-btn del" data-act="del" data-id="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
+        </tr>`).join('') || `<tr><td colspan="10" class="empty-row">${esc(t(rows.length ? 'sc.noMatch' : 'sc.none'))}</td></tr>`;
+    }
+
+    // Open the editor: 'new' = blank, 'edit' = this row, 'copy' = this row's data with a blank ItemCode, 'view' = read-only
+    function openEditor(m, r) {
+      mode = m; editId = r ? r.id : 0; looked = m === 'edit' ? r.itemCode : '';
+      $('scForm').reset();
+      if (r) {
+        $('scItem').value = m === 'copy' ? '' : r.itemCode;
+        $('scCustomer').value = r.customer || '';
+        $('scPart').value = r.partNo || '';
+        MATERIAL.forEach(([k]) => $('sc-' + k).value = r[k] || '');
+        r.lengths.forEach(l => {
+          const p = panel.querySelector(`[data-pos="${l.no}"]`), sp = panel.querySelector(`[data-spec="${l.no}"]`);
+          if (p) p.value = l.position; if (sp) sp.value = l.spec;
+        });
+      }
+      edR = r;
+      setEditorTitle();
+      $('scForm').querySelectorAll('input, textarea').forEach(i => i.disabled = m === 'view');
+      $('scSave').hidden = m === 'view' || (m === 'edit' ? !canEdit : !canAdd);
+      $('scPrint').hidden = !canExcel;
+
+      panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+      $('scForm').hidden = false;
+      fitText();
+      msg('');
+      drawList();
+      $('scForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (m !== 'view') (m === 'edit' ? $('scCustomer') : $('scItem')).focus({ preventScroll: true });
+    }
+    let edR = null;
+    function setEditorTitle() {
+      if (!mode) return;
+      $('scTitle').textContent = mode === 'new' ? t('sc.new') : mode === 'edit' ? t('sc.edit', { code: edR.itemCode })
+        : mode === 'copy' ? t('sc.copyT') : edR.itemCode;
+      $('scSub').textContent = mode === 'copy' ? t('sc.copiedFrom', { code: edR.itemCode }) : '';
+      $('scCancel').innerHTML = ico('x') + T(mode === 'view' ? 'b.close' : 'b.cancel');
+    }
+    function closeEditor() { mode = ''; editId = 0; $('scForm').hidden = true; drawList(); }
+
+    async function load() {
+      try { rows = await api('GET', '/api/spec'); drawList(); }
+      catch (e) { msg(e.message); }
+    }
+
+    // Item Code -> Part No (Marunix item) + Wire / Terminal / Housing / Other (BOM RM Names by QC Type)
+    let looked = '';
+    async function lookupItem() {
+      const code = $('scItem').value.trim();
+      if (!code || code === looked || mode === 'view') return;
+      looked = code;
+      try {
+        const r = await api('GET', `/api/spec/lookup?itemCode=${encodeURIComponent(code)}`);
+        if ($('scItem').value.trim() !== code) return;   // typed something else meanwhile
+        if (r.partNo) $('scPart').value = r.partNo;
+        MATERIAL.forEach(([k]) => $('sc-' + k).value = r[k]);
+        fitText();
+        const notes = [t('sc.bom', { n: r.bomRows })];
+        if (r.eol) notes.push(t('sc.eol', { list: r.eol }));
+        if (r.unclassified.length) notes.push(t('sc.unclass', { list: r.unclassified.map(u => `${u.code} ${u.name}`).join(', ') }));
+        msg(notes.join(' · '), r.unclassified.length ? 'err' : 'ok');
+      } catch (err) { looked = ''; msg(err.message); }   // allow a retry of the same code
+    }
+    $('scItem').addEventListener('change', lookupItem);
+    // Enter in Item Code looks it up instead of saving the form
+    $('scItem').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); looked = ''; lookupItem(); } });
+
+    // Grow the material boxes to fit their text, so long BOM lists are fully visible and printed
+    const fitText = () => MATERIAL.forEach(([k]) => { const t = $('sc-' + k); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; });
+    MATERIAL.forEach(([k]) => $('sc-' + k).addEventListener('input', fitText));
+    // Values on screen (for the editor's Print button)
+    function formData() {
+      const d = { customer: $('scCustomer').value.trim(), partNo: $('scPart').value.trim(), lengths: [] };
+      MATERIAL.forEach(([k]) => d[k] = $('sc-' + k).value.trim());
+      for (let i = 1; i <= 22; i++) {
+        d.lengths.push({ no: i, position: panel.querySelector(`[data-pos="${i}"]`).value.trim(), spec: panel.querySelector(`[data-spec="${i}"]`).value.trim() });
+      }
+      return d;
+    }
+    // SPEC -> Excel: one page with Customer, Part No, material text and the length Position / SPEC rows
+    async function specExcel(r, code) {
+      const page = { customer: r.customer || '', partNo: r.partNo || '', items: {}, total: '',
+        material: { wire: r.wire || '', terminal: r.terminal || '', housing: r.housing || '', other: r.other || '' },
+        lengths: (r.lengths || []).map(l => ({ no: l.no, position: l.position || '', spec: l.spec || '', samples: [] })) };
+      try {
+        const file = await downloadExcel('spec', `SPEC_${code || r.itemCode || 'new'}`, [page]);
+        msg(t('o.excelDone', { file }), 'ok');
+      } catch (err) { msg(err.message); }
+    }
+    $('scPrint').onclick = () => specExcel(formData(), $('scItem').value.trim());
+
+    $('scSearch').addEventListener('input', drawList);
+    if (canAdd) $('scAdd').onclick = () => openEditor('new');
+    $('scCancel').onclick = () => { closeEditor(); msg(''); };
+
+    $('scBody').onclick = async e => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      const r = rows.find(x => x.id === Number(b.dataset.id)); if (!r) return;
+      if (b.dataset.act === 'print') return specExcel(r, r.itemCode);
+      if (b.dataset.act !== 'del') return openEditor(b.dataset.act, r);
+      if (!await uiConfirm({ tone: 'danger', icon: '🗑️', title: t('sc.delT'),
+        message: t('sc.delM', { code: esc(r.itemCode), part: r.partNo ? ` (${esc(r.partNo)})` : '' }),
+        ok: t('b.delete'), cancel: t('b.keep') })) return;
+      try {
+        await api('DELETE', `/api/spec/${r.id}`);
+        if (editId === r.id) closeEditor();
+        msg(t('sc.deleted', { code: r.itemCode }), 'ok');
+        await load();
+      } catch (err) { msg(err.message); }
+    };
+
+    $('scForm').onsubmit = async e => {
+      e.preventDefault();
+      if (mode === 'view') return;
+      panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+      const itemCode = $('scItem').value.trim();
+      if (!itemCode) { $('scItem').classList.add('bad'); $('scItem').focus(); return msg(t('sc.needCode')); }
+      const body = { itemCode, customer: $('scCustomer').value.trim(), partNo: $('scPart').value.trim(), lengths: [] };
+      MATERIAL.forEach(([k]) => body[k] = $('sc-' + k).value.trim());
+      for (let i = 1; i <= 22; i++) {
+        const position = panel.querySelector(`[data-pos="${i}"]`).value.trim(), spec = panel.querySelector(`[data-spec="${i}"]`).value.trim();
+        if (position || spec) body.lengths.push({ no: i, position, spec });
+      }
+      $('scSave').disabled = true;
+      try {
+        if (mode === 'edit') await api('PUT', `/api/spec/${editId}`, body);
+        else await api('POST', '/api/spec', body);
+        msg(t(mode === 'edit' ? 'sc.saved' : 'sc.added', { code: itemCode }), 'ok');
+        closeEditor();
+        await load();
+      } catch (err) {
+        if (/Item Code/.test(err.message)) { $('scItem').classList.add('bad'); $('scItem').focus(); }
+        msg(err.message);
+      } finally { $('scSave').disabled = false; }
+    };
+
+    langHook = () => { drawList(); setEditorTitle(); };
+    load();
+  }
+
+  // User Management: everyone in tbUser; add / edit / delete follow Roles & Permissions (passwords are never loaded)
+  function renderUsers(panel) {
+    let rows = [], editId = '';
+    const canAdd = can('users.add'), canEdit = can('users.edit'), canDel = can('users.delete');
+    const me = String(currentUser && currentUser.id || '').trim();
+    panel.innerHTML = `
+      <form class="form-grid users-form" id="usForm" novalidate autocomplete="off" ${canAdd ? '' : 'hidden'}>
+        <label class="fld">${T('u.id')} <input id="usId" maxlength="10" ${P('u.phId')} autocomplete="off"></label>
+        <label class="fld">${T('u.name')} <input id="usName" maxlength="80" ${P('u.phName')} autocomplete="off"></label>
+        <label class="fld">${T('u.password')} <input id="usPass" type="password" maxlength="100" autocomplete="new-password"></label>
+        <label class="fld">${T('u.role')} <select id="usRole"><option value="User">User</option><option value="Admin">Admin</option></select></label>
+        <label class="fld">${T('u.dept')} <input id="usDept" maxlength="50" list="usDepts" ${P('u.phDept')} autocomplete="off"></label>
+        <datalist id="usDepts"></datalist>
+        <div class="form-actions">
+          <button class="btn-primary" id="usSubmit" type="submit">${ico('plus')}${T('b.add')}</button>
+          <button class="icon-btn" id="usCancel" type="button" hidden>${ico('x')}${T('b.cancel')}</button>
+        </div>
+      </form>
+      <div class="spec-bar">
+        <label class="search">${svg('search')}<input id="usSearch" type="search" ${P('u.search')} aria-label="Search users"></label>
+        <span class="count" id="usCount"></span>
+        <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
+      </div>
+      <div class="msg" id="usMsg" role="status"></div>
+      <div class="table-wrap"><table class="data">
+        <thead><tr>${['u.id', 'u.name', 'u.role', 'u.dept', 'u.created', 'u.updated'].map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
+        <tbody id="usBody"></tbody>
+      </table></div>`;
+    const $ = id => panel.querySelector('#' + id);
+    const s = v => esc(String(v ?? ''));
+    const msg = (text, kind = 'err') => { $('usMsg').textContent = text; $('usMsg').className = 'msg ' + kind; };
+    const sameId = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+    const setPassHint = () => $('usPass').placeholder = t(editId ? 'u.phPassKeep' : 'u.phPass');
+
+    function resetForm() {
+      editId = '';
+      $('usForm').reset();
+      $('usId').disabled = false;
+      $('usSubmit').innerHTML = ico('plus') + T('b.add');
+      $('usCancel').hidden = true;
+      $('usForm').hidden = !canAdd;
+      setPassHint();
+      panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+      draw();
+    }
+    $('usCancel').onclick = () => { resetForm(); msg(''); };
+
+    function draw() {
+      const q = $('usSearch').value.trim().toLowerCase();
+      const list = rows.filter(r => !q || [r.id, r.username, r.role, r.dept].some(v => String(v || '').toLowerCase().includes(q)));
+      $('usCount').textContent = q ? t('u.countOf', { n: list.length, total: rows.length }) : t('u.count', { n: rows.length });
+      $('usBody').innerHTML = list.map(r => {
+        const id = String(r.id).trim(), self = sameId(id, me);
+        return `<tr class="${editId && sameId(id, editId) ? 'editing' : ''}">
+          <td class="num">${s(id)}</td>
+          <td><span class="u-name"><span class="u-av">${s(String(r.username || '?').trim().charAt(0).toUpperCase())}</span>${s(r.username)}</span></td>
+          <td><span class="pill ${r.role === 'Admin' ? 'admin' : 'user'}">${s(r.role)}</span></td>
+          <td>${r.dept ? `<span class="pill dept">${s(r.dept)}</span>` : `<span class="meta">${esc(t('u.noDept'))}</span>`}</td>
+          <td class="meta">${s(r.regBy)} · ${fmtDate(r.regDate)}</td>
+          <td class="meta">${s(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
+          <td>${canEdit || canDel ? `<div class="row-actions">
+            ${canEdit ? `<button class="icon-btn" data-edit="${s(id)}">${ico('pencil')}${T('b.edit')}</button>` : ''}
+            ${canDel && !self ? `<button class="icon-btn del" data-del="${s(id)}">${ico('trash')}${T('b.delete')}</button>` : ''}
+          </div>` : ''}</td></tr>`;
+      }).join('') || `<tr><td colspan="7" class="empty-row">${esc(t('u.none'))}</td></tr>`;
+    }
+
+    function setRows(list) {
+      rows = list;
+      const depts = [...new Set(['QC', ...rows.map(r => String(r.dept || '').trim()).filter(Boolean)])].sort();
+      $('usDepts').innerHTML = depts.map(d => `<option value="${s(d)}">`).join('');
+      draw();
+    }
+    async function load() {
+      try { setRows(await api('GET', '/api/users')); } catch (err) { msg(err.message); }
+    }
+
+    $('usBody').onclick = async e => {
+      const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
+      if (ed) {
+        const r = rows.find(x => sameId(x.id, ed.dataset.edit));
+        if (!r) return;
+        editId = String(r.id).trim();
+        $('usForm').hidden = false;
+        $('usId').value = editId; $('usId').disabled = true;
+        $('usName').value = String(r.username || '').trim();
+        $('usPass').value = '';
+        $('usRole').value = r.role === 'Admin' ? 'Admin' : 'User';
+        $('usDept').value = String(r.dept || '').trim();
+        setPassHint();
+        $('usSubmit').innerHTML = ico('save') + T('b.save');
+        $('usCancel').hidden = false;
+        panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+        msg(t('u.editing', { id: editId, name: String(r.username || '').trim() }), 'ok');
+        draw();
+        $('usName').focus();
+      }
+      if (del) {
+        const r = rows.find(x => sameId(x.id, del.dataset.del));
+        if (!r) return;
+        const id = String(r.id).trim(), name = String(r.username || '').trim();
+        if (!await uiConfirm({ tone: 'danger', icon: '🗑️', title: t('u.delT'),
+          message: t('u.delM', { id: esc(id), name: esc(name) }), ok: t('b.delete'), cancel: t('b.keep') })) return;
+        try {
+          setRows(await api('DELETE', `/api/users/${encodeURIComponent(id)}`));
+          if (sameId(editId, id)) resetForm();
+          msg(t('u.deleted', { id, name }), 'ok');
+        } catch (err) { msg(err.message); }
+      }
+    };
+
+    $('usForm').onsubmit = async e => {
+      e.preventDefault();
+      panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
+      const bad = (field, key) => { $(field).classList.add('bad'); $(field).focus(); msg(t(key)); };
+      const body = { id: $('usId').value.trim(), username: $('usName').value.trim(), password: $('usPass').value,
+        role: $('usRole').value, dept: $('usDept').value.trim() };
+      if (!editId && !/^[A-Za-z0-9._-]{1,10}$/.test(body.id)) return bad('usId', 'u.errId');
+      if (!body.username) return bad('usName', 'u.errName');
+      if (!editId && !body.password) return bad('usPass', 'u.errPass');
+
+      $('usSubmit').disabled = true;
+      try {
+        if (editId) setRows(await api('PUT', `/api/users/${encodeURIComponent(editId)}`, body));
+        else setRows(await api('POST', '/api/users', body));
+        msg(t(editId ? 'u.saved' : 'u.added', { id: editId || body.id, name: body.username }), 'ok');
+        // Changing your own role or department changes what you may do, so reload to get the new permissions
+        if (editId && sameId(editId, me)) { setTimeout(() => location.reload(), 900); return; }
+        resetForm();
+        $('usId').focus();
+      } catch (err) {
+        if (/already exists|^ID\b/i.test(err.message)) $('usId').classList.add('bad');
+        msg(err.message);
+      } finally { $('usSubmit').disabled = false; }
+    };
+
+    $('usSearch').addEventListener('input', draw);
+    langHook = () => { draw(); setPassHint(); };
+    setPassHint();
+    load();
+  }
+
+  // Roles & Permissions: one row per user, one tick per page (View) and button (Add / Edit / Delete / Excel)
+  const PERM_GROUPS = [
+    { k: 'm.sampling', keys: ['sampling.view', 'sampling.add', 'sampling.edit', 'sampling.delete'] },
+    { k: 'm.spec', keys: ['spec.view', 'spec.add', 'spec.edit', 'spec.delete', 'spec.excel'] },
+    { k: 'm.daily', keys: ['daily.view', 'daily.add', 'daily.edit', 'daily.excel'] },
+    { k: 'm.users', keys: ['users.view', 'users.add', 'users.edit', 'users.delete'] },
+    { k: 'm.roles', keys: ['roles.view', 'roles.edit'] }
+  ];
+  function renderRoles(panel) {
+    const canEdit = can('roles.edit');
+    let users = [], orig = new Map(), draft = new Map();
+    const KEYS = PERM_GROUPS.flatMap(g => g.keys);
+    const groupOf = k => PERM_GROUPS.find(g => g.keys.includes(k));
+    panel.innerHTML = `
+      <div class="readonly-note" ${canEdit ? 'hidden' : ''}>${svg('lock')} ${T('r.readonly')}</div>
+      <p class="perm-hint">${T('r.hint')}</p>
+      <div class="spec-bar">
+        <label class="search">${svg('search')}<input id="pmSearch" type="search" ${P('r.search')} aria-label="Search users"></label>
+        <span class="count" id="pmCount"></span>
+        <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
+      </div>
+      <div class="msg" id="pmMsg" role="status"></div>
+      <div class="table-wrap perm-wrap"><table class="perm-grid">
+        <thead>
+          <tr><th rowspan="2" class="sticky">${T('r.user')}</th>
+            ${PERM_GROUPS.map(g => `<th colspan="${g.keys.length}" class="grp">${T(g.k)}</th>`).join('')}
+            <th rowspan="2"></th></tr>
+          <tr>${KEYS.map(k => `<th class="act"><button type="button" data-col="${k}" ${canEdit ? '' : 'disabled'} title="${esc(t('r.all'))}">${T('p.' + k.split('.')[1])}</button></th>`).join('')}</tr>
+        </thead>
+        <tbody id="pmBody"></tbody>
+      </table></div>
+      <div class="perm-save" id="pmSave" hidden>
+        <span id="pmChanges"></span>
+        <button class="icon-btn" id="pmCancel" type="button">${ico('x')}${T('b.cancel')}</button>
+        <button class="btn-primary" id="pmApply" type="button">${ico('save')}${T('b.save')}</button>
+      </div>`;
+    const $ = id => panel.querySelector('#' + id);
+    const msg = (text, kind = 'err') => { $('pmMsg').textContent = text; $('pmMsg').className = 'msg ' + kind; };
+    const sameSet = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
+    const changedIds = () => users.map(u => u.id).filter(id => !sameSet(orig.get(id), draft.get(id)));
+
+    function load(list) {
+      users = list;
+      orig = new Map(list.map(u => [u.id, new Set(u.perms)]));
+      draft = new Map(list.map(u => [u.id, new Set(u.perms)]));
+      draw();
+    }
+    function draw() {
+      const q = $('pmSearch').value.trim().toLowerCase();
+      const list = users.filter(u => !q || [u.id, u.username, u.role, u.dept].some(v => String(v || '').toLowerCase().includes(q)));
+      $('pmCount').textContent = q ? t('u.countOf', { n: list.length, total: users.length }) : t('u.count', { n: users.length });
+      const s2 = v => esc(String(v ?? ''));
+      $('pmBody').innerHTML = list.map(u => {
+        const d = draft.get(u.id), o = orig.get(u.id);
+        return `<tr data-id="${s2(u.id)}"${u.id === currentUser.id ? ' class="me"' : ''}>
+          <td class="sticky"><div class="pm-user">
+            <span class="u-av">${s2(String(u.username || '?').trim().charAt(0).toUpperCase())}</span>
+            <span class="pm-who"><b>${s2(u.username)}</b><small>${s2(u.id)} · ${s2(u.role)}${u.dept ? ' · ' + s2(u.dept) : ''}</small></span>
+            <span class="pill ${u.custom ? 'custom' : 'default'}">${esc(t(u.custom ? 'r.custom' : 'r.default'))}</span>
+          </div></td>
+          ${KEYS.map(k => `<td class="cb${d.has(k) !== o.has(k) ? ' changed' : ''}${k.endsWith('.view') ? ' view' : ''}">
+            <label class="tick"><input type="checkbox" data-k="${k}" ${d.has(k) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}
+              aria-label="${s2(u.username)} ${esc(t(groupOf(k).k))} ${esc(t('p.' + k.split('.')[1]))}"><span></span></label></td>`).join('')}
+          <td>${canEdit && u.custom ? `<button class="icon-btn" data-reset="${s2(u.id)}" title="${esc(t('r.reset'))}">${ico('x')}${T('r.reset')}</button>` : ''}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="${KEYS.length + 2}" class="empty-row">${esc(t('u.none'))}</td></tr>`;
+      const n = changedIds().length;
+      $('pmSave').hidden = !n;
+      $('pmChanges').textContent = t('r.changes', { n });
+    }
+
+    // Tick a box: using a button needs the page's View; removing View removes that page's buttons too
+    function setPerm(id, k, on) {
+      const d = draft.get(id);
+      const g = groupOf(k), view = g.keys[0];
+      if (on) { d.add(k); d.add(view); }
+      else { d.delete(k); if (k === view) g.keys.forEach(x => d.delete(x)); }
+    }
+    $('pmBody').addEventListener('change', e => {
+      const cb = e.target.closest('input[data-k]'); if (!cb) return;
+      setPerm(cb.closest('tr').dataset.id, cb.dataset.k, cb.checked);
+      draw();
+    });
+    // Column header: tick / untick that permission for every user in the list
+    panel.querySelector('thead').addEventListener('click', e => {
+      const b = e.target.closest('[data-col]'); if (!b || !canEdit) return;
+      const ids = [...$('pmBody').querySelectorAll('tr[data-id]')].map(tr => tr.dataset.id);
+      const allOn = ids.every(id => draft.get(id).has(b.dataset.col));
+      ids.forEach(id => setPerm(id, b.dataset.col, !allOn));
+      draw();
+    });
+    $('pmBody').addEventListener('click', async e => {
+      const b = e.target.closest('[data-reset]'); if (!b) return;
+      const u = users.find(x => x.id === b.dataset.reset);
+      if (!await uiConfirm({ icon: '↺', title: t('r.resetT', { name: u.username }), message: esc(t('r.resetM')), ok: t('r.reset'), cancel: t('b.cancel') })) return;
+      await save([{ id: u.id, perms: null }]);
+    });
+    $('pmCancel').onclick = () => { draft = new Map([...orig].map(([id, set]) => [id, new Set(set)])); draw(); msg(''); };
+    $('pmApply').onclick = () => save(changedIds().map(id => ({ id, perms: [...draft.get(id)] })));
+    async function save(list) {
+      if (!list.length) return;
+      $('pmApply').disabled = true;
+      try {
+        const r = await api('PUT', '/api/permissions', { users: list });
+        load(r.users);
+        msg(t('r.saved'), 'ok');
+        // My own rights changed: reload so the menu and buttons follow them
+        if (list.some(x => x.id === currentUser.id)) setTimeout(() => location.reload(), 900);
+      } catch (err) { msg(err.message); } finally { $('pmApply').disabled = false; }
+    }
+    $('pmSearch').addEventListener('input', draw);
+    langHook = draw;
+    api('GET', '/api/permissions').then(r => load(r.users)).catch(err => msg(err.message));
+  }
+
+  // OQC Data Information: the paper "OQC Inspection record" (REF QC-RE-002 REV:02) as a fill-in form
+  function renderOQC(panel, opts = {}) {
+    const res = (label, def = '') => `<select class="res" aria-label="${esc(label)} result"${def ? ` data-v="${def}"` : ''}>${
+      ['', 'OK', 'NG', '/'].map(v => `<option value="${v}"${v === def ? ' selected' : ''}>${v}</option>`).join('')}</select>`;
+    const CIRC = OQC_CIRC, INFO = OQC_INFO, MATERIAL = OQC_MATERIAL, ITEMS = OQC_ITEMS;
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const lenTable = from => `<table class="oqc oqc-len">
+        <thead>
+          <tr><th class="c" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
+            <th rowspan="2">${bi('តំលៃប្រវែងកំណត់', 'SPEC')}</th><th class="c" colspan="5">Sample</th></tr>
+          <tr>${CIRC.map(c => `<th class="c">${c}</th>`).join('')}</tr>
+        </thead>
+        <tbody>${Array.from({ length: 11 }, (_, k) => from + k).map(i => `<tr>
+          <td class="no">${i}</td>
+          <td><input data-pos="${i}" aria-label="Length position ${i}"></td>
+          <td><input class="spec" data-spec="${i}" aria-label="Spec ${i}"></td>
+          ${CIRC.map((_, s) => `<td class="smp"><input class="smp" inputmode="decimal" aria-label="Row ${i} sample ${s + 1}"></td>`).join('')}
+        </tr>`).join('')}
+          <tr class="sec"><td colspan="3">${bi('លទ្ធផល', 'Result')}</td><td colspan="5">${res(`Length ${from}-${from + 10}`)}</td></tr>
+        </tbody>
+      </table>`;
+
+    panel.innerHTML = `
+      <div class="oqc-toolbar">
+        <label class="search oqc-scan">
+          <svg class="i" viewBox="0 0 24 24"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>
+          <input id="oqcScan" ${P('ph.scan')} aria-label="Scan label barcode" autocomplete="off">
+          <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
+        </label>
+        <button class="btn-primary oqc-save" id="oqcSave" type="button" ${can('daily.add') || can('daily.edit') ? '' : 'disabled ' + TT('e.noPerm')}>${ico('save')}${T('b.save')}</button>
+        <button class="icon-btn" id="oqcFindBtn" type="button" aria-expanded="false" aria-controls="oqcFind">${ico('search')}${T('b.search')}</button>
+        <button class="icon-btn" id="oqcNew" type="button">${ico('sparkle')}${T('b.new')}</button>
+        <button class="icon-btn" id="oqcPrint" type="button" ${can('daily.excel') ? '' : 'hidden'}>${ico('excel')}${T('b.excel')}</button>
+        <div class="oqc-pager" role="group" aria-label="Pages">
+          <button class="icon-btn" id="oqcPrev" type="button" ${TT('t.prevPage')}>${svg('chev', 'i flip')}</button>
+          <span class="oqc-pageno" id="oqcPageInfo" aria-live="polite">Page 1 / 1</span>
+          <button class="icon-btn next" id="oqcNext" type="button">${ico('filePlus')}${T('b.addPage')}</button>
+          <button class="icon-btn del" id="oqcDelPage" type="button" ${TT('t.removeThisPage')} hidden>${ico('fileMinus')}${T('b.removePage')}</button>
+        </div>
+        <span class="oqc-rec" id="oqcRec" data-state="new">New</span>
+        <div class="msg" id="oqcMsg" role="status"></div>
+      </div>
+      <div class="oqc-find" id="oqcFind" hidden>
+        <div class="oqc-find-bar">
+          <label class="search">${svg('list')}<input id="oqcFindQ" type="search" ${P('ph.find')} aria-label="Search saved records"></label>
+          <span class="count" id="oqcFindCount"></span>
+          <span class="spinner" aria-hidden="true"></span>
+          <button class="icon-btn" id="oqcFindClose" type="button">${ico('x')}${T('b.close')}</button>
+        </div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr>${['h.lot', 'h.box', 'h.itemCode', 'h.partNo', 'h.customer', 'h.checkDate', 'h.pages', 'h.status', 'h.total', 'h.lastSaved'].map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
+          <tbody id="oqcFindBody"></tbody>
+        </table></div>
+      </div>
+      <form class="oqc-sheet" id="oqcForm" autocomplete="off" onsubmit="return false">
+        ${oqcHead(`<label>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}<input type="date" id="oqcDate" value="${today}"></label><small class="oqc-sheet-page">Page 1 / 1</small>`)}
+
+        <div class="oqc-info-wrap"><table class="oqc oqc-info">
+          <tr>${INFO.map(([km, en]) => `<th class="c">${bi(km, en)}</th>`).join('')}</tr>
+          <tr>${INFO.map(([, en, id]) => id === 'oqcProb'
+            ? `<td><div class="seg oqc-prob" role="group" aria-label="Probability">
+                <button type="button" data-prob="Normal" aria-pressed="false">Normal</button>
+                <button type="button" data-prob="Strict" aria-pressed="false">Strict</button>
+              </div></td>`
+            : `<td><input id="${id}" aria-label="${esc(en)}"${id === 'oqcQty' || id === 'oqcSpot' ? ' inputmode="numeric"' : ''}></td>`).join('')}</tr>
+        </table></div>
+
+        <div class="oqc-cols">
+          <table class="oqc">
+            <tr><th>${bi('ប្រភេទត្រួតពិនិត្យ', 'INSPECTION ITEM')}</th><th class="c">${bi('លទ្ធផល', 'Result')}</th></tr>
+            <tr class="sec"><td>${bi('1) ត្រួតពិនិត្យវត្ថុធាតុដើម', 'MATERIAL CHECK')}</td>
+              <td class="rc"><select class="res" id="oqcMatRes" aria-label="Material check result"><option value=""></option><option>OK</option><option>NG</option></select></td></tr>
+            ${MATERIAL.map(([n, km, en]) => `<tr>
+              <td colspan="2"><div class="oqc-sec-title">${n} <span class="km">${km}</span> <span class="en">[${en}]</span></div>
+                <textarea id="oqc-${en.toLowerCase()}" rows="3" aria-label="Material ${en}"></textarea></td></tr>`).join('')}
+          </table>
+          <table class="oqc">
+            <tr><th>${bi('ប្រភេទត្រួតពិនិត្យ', 'INSPECTION ITEM')}</th><th class="c">${bi('លទ្ធផល', 'Result')}</th></tr>
+            ${ITEMS.map(([km, en, def]) => `<tr>
+              <td>${bi(km, en)}</td>
+              <td class="rc">${res(en, def)}</td></tr>`).join('')}
+          </table>
+        </div>
+
+        <div>
+          <div class="oqc-sec-title"><span class="km">2) ត្រួតពិនិត្យប្រវែង</span> <span class="en">[Length Check]</span></div>
+          <div class="oqc-cols">
+            <div class="oqc-len-wrap">${lenTable(1)}</div>
+            <div class="oqc-len-wrap">${lenTable(12)}</div>
+          </div>
+        </div>
+
+        <div class="oqc-foot-wrap"><table class="oqc oqc-foot">
+          <tr>
+            <td rowspan="2" style="width:52%">${bi('កំណត់សំគាល់', 'Remarks')}<textarea rows="3" aria-label="Remarks"></textarea></td>
+            <th class="c">${bi('សរុបលទ្ធផល', 'Total Determination')}</th>
+            <th class="c">${bi('ត្រួតពិនិត្យដោយ', 'Checked by')}</th>
+            <th class="c">${bi('អ្នកត្រួតពិនិត្យ', 'Inspector')}</th>
+          </tr>
+          <tr>
+            <td><select class="res" id="oqcTotal" aria-label="Total determination"><option value=""></option><option>OK</option><option>NG</option></select></td>
+            <td><input id="oqcChecked" class="badge-in" aria-label="Checked by" ${P('ph.badge')}></td>
+            <td><input id="oqcInspector" class="badge-in" aria-label="Inspector" ${P('ph.badge')} value="${esc(String((currentUser && currentUser.username) || ''))}"></td>
+          </tr>
+        </table></div>
+      </form>`;
+
+    const $ = id => panel.querySelector('#' + id);
+    const msg = (text, kind = 'err') => { $('oqcMsg').textContent = text; $('oqcMsg').className = 'msg ' + kind; };
+    const setRes = (sel, v) => { sel.value = v; sel.dataset.v = v; };
+
+    // SPEC formats: "100±2", "100+2/-1", "98-102"
+    function parseSpec(s) {
+      const N = '(-?\\d+(?:\\.\\d+)?)';
+      let m;
+      if ((m = s.match(new RegExp(`^\\s*${N}\\s*±\\s*${N}\\s*$`)))) return [+m[1] - +m[2], +m[1] + +m[2]];
+      if ((m = s.match(new RegExp(`^\\s*${N}\\s*\\+\\s*${N}\\s*/?\\s*-\\s*${N}\\s*$`)))) return [+m[1] - +m[3], +m[1] + +m[2]];
+      if ((m = s.match(new RegExp(`^\\s*${N}\\s*[-~–]\\s*${N}\\s*$`)))) return [Math.min(+m[1], +m[2]), Math.max(+m[1], +m[2])];
+      return null;
+    }
+
+    // Samples outside SPEC turn red; the table's Result becomes NG/OK once any sample can be checked
+    function checkLength(table) {
+      const { checked, bad } = markLength(table);
+      if (checked) setRes(table.querySelector('select.res'), bad ? 'NG' : 'OK');
+    }
+    const REQUIRED_SAMPLES = 3;   // ①②③ must be measured; ④⑤ are optional
+    // Colour out-of-SPEC samples red; returns how many samples could be checked / were NG
+    function markLength(table) {
+      let checked = 0, bad = 0;
+      table.querySelectorAll('tbody tr:not(.sec)').forEach(tr => {
+        const spec = parseSpec(tr.querySelector('.spec').value);
+        tr.querySelectorAll('input.smp').forEach(inp => {
+          const v = inp.value.trim();
+          let ng = false;
+          if (v !== '' && spec) {
+            const n = Number(v);
+            checked++;
+            ng = !Number.isFinite(n) || n < spec[0] - 1e-9 || n > spec[1] + 1e-9;
+            if (ng) bad++;
+          }
+          inp.classList.toggle('ng', ng);
+        });
+      });
+      // Rows without a SPEC are not measured: show them as blank cells (no input boxes), like the paper form
+      table.querySelectorAll('tbody tr:not(.sec)').forEach(tr => {
+        tr.classList.toggle('nospec', !tr.querySelector('[data-spec]').value.trim());
+        tr.classList.toggle('nopos', !tr.querySelector('[data-pos]').value.trim());
+      });
+      slashUnused(table);
+      return { checked, bad };
+    }
+    // ①②③ measured and all within SPEC in every used row, and none of ④⑤ used: strike out the ④⑤ block with one diagonal line,
+    // from the top-right of ⑤ to the bottom-left of ④, like on paper. Each cell draws its piece of the line in %,
+    // so it stays straight at any size, including the printed sheet.
+    function slashUnused(table) {
+      table.querySelectorAll('svg.slash').forEach(x => x.remove());
+      const rows = [...table.querySelectorAll('tbody tr:not(.sec)')];
+      const extra = rows.some(tr => [...tr.querySelectorAll('input.smp')].slice(REQUIRED_SAMPLES).some(i => i.value.trim() !== ''));
+      // Only rows with a SPEC are checked: each needs ①②③ measured and none of them red (out of SPEC)
+      const used = rows.filter(tr => tr.querySelector('[data-spec]').value.trim());
+      const allGood = used.length > 0 && used.every(tr => [...tr.querySelectorAll('input.smp')].slice(0, REQUIRED_SAMPLES)
+        .every(i => i.value.trim() !== '' && !i.classList.contains('ng')));
+      const on = allGood && !extra;
+      table.classList.toggle('slashed', on);
+      if (!on) return;
+      const n = rows.length, cols = 5 - REQUIRED_SAMPLES;
+      rows.forEach((tr, r) => {
+        [...tr.querySelectorAll('td.smp')].slice(REQUIRED_SAMPLES).forEach((td, c) => {
+          const x = y => ((cols - cols * y / n - c) * 100).toFixed(2) + '%';
+          td.insertAdjacentHTML('beforeend', `<svg class="slash" aria-hidden="true"><line x1="${x(r)}" y1="0" x2="${x(r + 1)}" y2="100%"/></svg>`);
+        });
+      });
+    }
+
+    // Total Determination: NG if any item is NG, OK once something is OK and nothing is NG
+    function updateTotal() {
+      const vals = [...panel.querySelectorAll('select.res:not(#oqcTotal)')].map(s => s.value);
+      setRes($('oqcTotal'), vals.includes('NG') ? 'NG' : vals.includes('OK') ? 'OK' : '');
+    }
+
+    $('oqcForm').addEventListener('input', e => {
+      const len = e.target.closest('.oqc-len');
+      if (len) { checkLength(len); updateTotal(); }
+    });
+    $('oqcForm').addEventListener('change', e => {
+      if (!e.target.matches('select.res')) return;
+      e.target.dataset.v = e.target.value;
+      if (e.target.id !== 'oqcTotal') updateTotal();
+    });
+    // 1) MATERIAL CHECK starts as OK; the inspector changes it to NG if needed
+    setRes($('oqcMatRes'), 'OK');
+    updateTotal();
+
+    // PROBABILITY (Normal / Strict) + QUANTITY -> SPOT CHECK = Inspection All Qty of the OQC Inspection
+    // range whose Shipment Qty covers the quantity. Strict uses the ranges stored as level "Hard".
+    const LEVEL_OF = { Normal: 'Normal', Strict: 'Hard' };
+    let prob = '';
+    async function fillSpot() {
+      const qty = $('oqcQty').value.trim();
+      if (!prob) return msg(t('o.chooseProb'));
+      if (!/^\d+$/.test(qty) || Number(qty) < 1) return msg(t('o.enterQty'));
+      try {
+        const r = await api('GET', `/api/sampling/lookup?level=${LEVEL_OF[prob]}&qty=${qty}`);
+        $('oqcSpot').value = r.sampleQty;
+        msg(t('o.spot', { n: r.sampleQty, prob, range: `${r.qtyFrom}-${r.qtyTo}` }), 'ok');
+      } catch (err) {
+        $('oqcSpot').value = '';
+        msg(/range covers/.test(err.message)
+          ? t('o.noRange', { prob, qty })
+          : err.message);
+      }
+    }
+    panel.querySelectorAll('.oqc-prob button').forEach(b => b.onclick = () => {
+      prob = b.dataset.prob;
+      panel.querySelectorAll('.oqc-prob button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      fillSpot();
+    });
+    $('oqcQty').addEventListener('change', () => { if (prob) fillSpot(); });
+
+    // Scanner types the barcode "26-0700394/8802/4500/002" = LotNo / ItemCode / Qty / BoxNO,
+    // followed by Enter or Tab (or nothing: then it runs when the box loses focus)
+    let lastScan = '';
+    async function scan() {
+      const code = $('oqcScan').value.trim();
+      if (!code) return;
+      lastScan = code;
+      const m = code.match(/^\*?([^/*]+)\/([^/]*)\/([^/]*)\/([^/*]+)\*?$/);
+      if (!m) return msg(t('o.badCode', { code }));
+      const lot = m[1].trim(), item = m[2].trim(), qtyInCode = m[3].trim(), box = m[4].trim();
+      try {
+        // Already saved? Open it to update instead of starting over
+        const saved = await api('GET', `/api/oqc/records?lot=${encodeURIComponent(lot)}&box=${encodeURIComponent(box)}`);
+        if (saved.length) {
+          if (saved[0].id !== rec.id) {
+            if (dirty && !await confirmDiscard()) return;
+            await loadRecord(saved[0].id);
+          }
+          const s0 = saved[0];
+          msg(t('o.openedSaved', { lot, box, state: t(s0.complete ? 'st.complete' : 'st.draft'), by: s0.updateBy, date: fmtDate(s0.updateDate) }), 'ok');
+          $('oqcScan').select();
+          return;
+        }
+        // A saved record is open and this is another label: start a new record for it
+        if (rec.id) {
+          if (dirty && !await confirmDiscard()) return;
+          return renderOQC(panel, { scan: code });
+        }
+        rec.box = box; rec.itemCode = item;
+        const r = await api('GET', `/api/oqc/label?lot=${encodeURIComponent(lot)}&item=${encodeURIComponent(item)}&box=${encodeURIComponent(box)}`);
+        rec.itemCode = r.itemCode || item;
+        $('oqcCustomer').value = r.customer ?? '';
+        $('oqcPart').value = r.partNo ?? '';
+        $('oqcLot').value = lot;
+        $('oqcQty').value = r.qty ?? (/^\d+$/.test(qtyInCode) ? qtyInCode : '');
+        $('oqcSpot').value = '';
+        // Wire / Terminal / Housing / Other from the SPEC page (MstSpec) for the Item Code
+        ['wire', 'terminal', 'housing', 'other'].forEach(k => $('oqc-' + k).value = r.spec ? r.spec[k] || '' : '');
+        // Length Check: Position + SPEC of each SPEC line go to the row with № = LineNo; other rows are cleared
+        const byLine = new Map(((r.spec && r.spec.lengths) || []).map(l => [Number(l.line), l]));
+        for (let i = 1; i <= 22; i++) {
+          const l = byLine.get(i);
+          panel.querySelector(`[data-pos="${i}"]`).value = l ? l.position || '' : '';
+          panel.querySelector(`[data-spec="${i}"]`).value = l ? l.spec || '' : '';
+        }
+        // A new label is a new inspection: clear the previous label's samples and length results
+        panel.querySelectorAll('.oqc-len input.smp').forEach(inp => { inp.value = ''; inp.classList.remove('ng'); });
+        panel.querySelectorAll('.oqc-len select.res').forEach(sel => setRes(sel, ''));
+        panel.querySelectorAll('.oqc-len').forEach(markLength);
+        updateTotal();
+        markDirty();   // a freshly scanned form is not saved yet
+
+        const notes = [t('o.scanned', { lot, box, item: r.itemCode })];
+        if (r.vendor) notes.push(t('o.vendor', { v: r.vendor }));
+        if (byLine.size) notes.push(t('o.lines', { n: byLine.size }));
+        const warnings = [];
+        if (!r.labelFound) warnings.push(t('o.noLabel', { lot, box }));
+        if (r.itemMismatch) warnings.push(t('o.mismatch', { a: item, b: r.itemMismatch }));
+        if (!r.spec) warnings.push(t('o.noSpec', { item: r.itemCode }));
+        if (prob) {
+          await fillSpot();
+          if ($('oqcMsg').className.includes('ok')) notes.push($('oqcMsg').textContent); else warnings.push($('oqcMsg').textContent);
+        }
+        msg([...notes, ...warnings].join(' · '), warnings.length ? 'err' : 'ok');
+      } catch (err) { msg(err.message); }
+      $('oqcScan').select();
+    }
+    $('oqcScan').addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== 'Tab') return;
+      e.preventDefault();
+      scan();
+    });
+    $('oqcScan').addEventListener('change', () => { if ($('oqcScan').value.trim() !== lastScan) scan(); });
+    $('oqcScan').focus();
+
+    // Checked by / Inspector: a scanned staff badge "MKH-2398" becomes the Username of tbUser ID 2398;
+    // anything else is kept as typed by hand
+    async function resolveBadge(inp) {
+      const m = inp.value.trim().match(/^MKH-?([\w-]{1,10})$/i);
+      if (!m) return;
+      try {
+        const u = await api('GET', `/api/user/name?id=${encodeURIComponent(m[1])}`);
+        inp.value = u.username;
+        msg(t('o.badge', { field: fieldName(inp.getAttribute('aria-label')), name: u.username, id: u.id }), 'ok');
+      } catch (err) { msg(`${fieldName(inp.getAttribute('aria-label'))}: ${err.message}`); inp.select(); }
+    }
+    panel.querySelectorAll('.badge-in').forEach(inp => {
+      inp.addEventListener('keydown', e => {
+        if ((e.key === 'Enter' || e.key === 'Tab') && /^MKH-?/i.test(inp.value.trim())) { e.preventDefault(); resolveBadge(inp); }
+      });
+      inp.addEventListener('change', () => resolveBadge(inp));
+    });
+
+    // ---- Pages: each page is a snapshot of every field on the sheet. "Add page" on the last page adds a page that
+    // copies the current one (header, inspection items, material check, footer) with an empty Length Check.
+    let pages = [null], cur = 0;
+    const fields = root => [...root.querySelectorAll('input, select, textarea')];
+    const snapshot = () => ({ vals: fields($('oqcForm')).map(c => c.value), prob });
+    function setProbUI(root, p) {
+      root.querySelectorAll('.oqc-prob button').forEach(b => b.setAttribute('aria-pressed', b.dataset.prob === p));
+    }
+    function applySnapshot(root, snap) {
+      fields(root).forEach((c, i) => {
+        c.value = snap.vals[i] ?? '';
+        if (c.matches('select.res')) c.dataset.v = c.value;
+      });
+      setProbUI(root, snap.prob);
+      root.querySelectorAll('.oqc-len').forEach(markLength);
+    }
+    function showPages() {
+      const n = pages.length;
+      $('oqcPageInfo').textContent = t('pg', { n: cur + 1, total: n });
+      panel.querySelector('.oqc-sheet-page').textContent = `Page ${cur + 1} / ${n}`;
+      $('oqcPrev').disabled = cur === 0;
+      $('oqcNext').innerHTML = cur === n - 1 ? ico('filePlus') + T('b.addPage') : T('b.nextPage') + ' ' + svg('chev');
+      $('oqcDelPage').hidden = n === 1;
+    }
+    function goTo(i) {
+      pages[cur] = snapshot();
+      cur = i;
+      applySnapshot($('oqcForm'), pages[cur]);
+      prob = pages[cur].prob;
+      showPages();
+      $('oqcForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    $('oqcPrev').onclick = () => { if (cur > 0) goTo(cur - 1); };
+    $('oqcNext').onclick = () => {
+      if (cur < pages.length - 1) return goTo(cur + 1);
+      // New page: copy this page, then empty its Length Check (Position, SPEC, samples, results)
+      pages[cur] = snapshot();
+      const copy = { vals: [...pages[cur].vals], prob: pages[cur].prob };
+      fields($('oqcForm')).forEach((c, i) => { if (c.closest('.oqc-len')) copy.vals[i] = ''; });
+      pages.push(copy);
+      goTo(pages.length - 1);
+      markDirty();
+      updateTotal();
+      msg(t('o.pageAdded', { n: cur + 1, from: cur }), 'ok');
+    };
+    $('oqcDelPage').onclick = async () => {
+      if (!await uiConfirm({ tone: 'danger', icon: '🗑️', title: t('o.removeT', { n: cur + 1 }),
+        message: t('o.removeM'), ok: t('b.remove'), cancel: t('b.keep') })) return;
+      pages.splice(cur, 1);
+      markDirty();
+      cur = Math.min(cur, pages.length - 1);
+      applySnapshot($('oqcForm'), pages[cur]);
+      prob = pages[cur].prob;
+      showPages();
+      msg(t('o.pageRemoved', { n: pages.length }), 'ok');
+    };
+
+    showPages();
+    panel.querySelectorAll('.oqc-len').forEach(markLength);   // blank rows without SPEC from the start
+
+    // ---- Before printing, every page must be complete (Remarks and the material text are optional)
+    const CIRCLED = ['①', '②', '③', '④', '⑤'];
+    function missingOn(root) {
+      const miss = [];
+      const need = (el, label) => { if (el && !String(el.value || '').trim()) miss.push({ el, label }); };
+      need(root.querySelector('input[type="date"]'), fieldName('Check date'));
+      ['CUSTOMER', 'PART №', 'LOT №', 'QUANTITY', 'SPOT CHECK'].forEach(a => need(root.querySelector(`input[aria-label="${a}"]`), fieldName(a)));
+      if (!root.querySelector('.oqc-prob button[aria-pressed="true"]')) miss.push({ el: root.querySelector('.oqc-prob'), label: fieldName('Probability') });
+      root.querySelectorAll('select.res').forEach(sel => {
+        if (sel.closest('.oqc-len') || sel.getAttribute('aria-label') === 'Total determination') return;
+        need(sel, fieldName(sel.getAttribute('aria-label').replace(/ result$/, '').replace(/^Material check$/, 'Material check')));
+      });
+      root.querySelectorAll('.oqc-len').forEach(table => {
+        let used = false;
+        table.querySelectorAll('tbody tr:not(.sec)').forEach(tr => {
+          const no = tr.querySelector('.no').textContent.trim();
+          const pos = tr.querySelector('[data-pos]'), spec = tr.querySelector('[data-spec]');
+          // Only rows with a SPEC are checked (a Position without SPEC is not measured)
+          if (!spec.value.trim()) return;
+          used = true;
+          if (!pos.value.trim()) miss.push({ el: pos, label: t('o.lenPos', { no }) });
+          const empty = [...tr.querySelectorAll('input.smp')].slice(0, REQUIRED_SAMPLES).map((inp, i) => inp.value.trim() ? null : { el: inp, i }).filter(Boolean);
+          if (empty.length) {
+            empty.forEach(x => miss.push({ el: x.el, label: null }));
+            miss.push({ el: null, label: t('o.lenSample', { no, list: empty.map(x => CIRCLED[x.i]).join('') }) });
+          }
+        });
+        if (used) need(table.querySelector('select.res'), fieldName('Length Check result'));
+      });
+      need(root.querySelector('select[aria-label="Total determination"]'), fieldName('Total Determination'));
+      need(root.querySelector('input[aria-label="Checked by"]'), fieldName('Checked by'));
+      need(root.querySelector('input[aria-label="Inspector"]'), fieldName('Inspector'));
+      return miss;
+    }
+    function clearMissing() { panel.querySelectorAll('.missing').forEach(el => el.classList.remove('missing')); }
+    $('oqcForm').addEventListener('input', e => e.target.classList.remove('missing'));
+    $('oqcForm').addEventListener('change', e => e.target.classList.remove('missing'));
+    $('oqcForm').addEventListener('click', e => { const g = e.target.closest('.oqc-prob'); if (g) g.classList.remove('missing'); });
+
+    // Print every page, one A4 sheet each — only when nothing is missing
+    $('oqcPrint').onclick = async () => {
+      pages[cur] = snapshot();
+      clearMissing();
+      const problems = pages.map((snap, i) => {
+        const tmp = $('oqcForm').cloneNode(true);
+        applySnapshot(tmp, snap);
+        return { page: i, miss: missingOn(tmp) };
+      }).filter(x => x.miss.length);
+      if (problems.length) {
+        const first = problems[0].page;
+        if (first !== cur) goTo(first);
+        missingOn($('oqcForm')).forEach(m => m.el && m.el.classList.add('missing'));
+        const lines = problems.map(x => {
+          const labels = x.miss.map(m => m.label).filter(Boolean);
+          const shown = labels.slice(0, 8).map(esc).join(', ') + (labels.length > 8 ? ' ' + t('o.more', { n: labels.length - 8 }) : '');
+          return `<b>${esc(t('o.pageN', { n: x.page + 1 }))}:</b> ${shown}`;
+        });
+        await uiAlert({ icon: '📝', title: t('o.notReadyT'),
+          message: `${esc(t('o.notReadyM'))}<br><br>${lines.join('<br>')}`, ok: t('b.gotIt') });
+        const firstEl = panel.querySelector('.missing');
+        if (firstEl) { firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (firstEl.focus) firstEl.focus({ preventScroll: true }); }
+        return;
+      }
+      // Complete: download every page as an Excel file filled into "OQC Data.xlsx"
+      const named = pages.map(namedFromSnap);
+      const lot = named[0].lot || 'OQC';
+      try {
+        const file = await downloadExcel('oqc', `OQC_${lot}${rec.box ? '_' + rec.box : ''}`, named);
+        msg(t('o.excelDone', { file }), 'ok');
+      } catch (err) { msg(err.message); }
+    };
+    // ---- Saved records: each page is stored with named fields (not positions), so later form changes keep old records readable
+    let rec = { id: 0, box: '', itemCode: '' }, dirty = false;
+    const canSave = can('daily.add') || can('daily.edit');
+    function setStatus() {
+      const el = $('oqcRec');
+      el.dataset.state = rec.id ? (dirty ? 'changed' : 'saved') : (dirty ? 'unsaved' : 'new');
+      el.textContent = rec.id ? t(dirty ? 'st.changed' : 'st.saved', { id: rec.id }) : t(dirty ? 'st.newUnsaved' : 'st.new');
+    }
+    const markDirty = () => { if (!dirty) { dirty = true; setStatus(); } };
+    $('oqcForm').addEventListener('input', markDirty);
+    $('oqcForm').addEventListener('change', markDirty);
+    $('oqcForm').addEventListener('click', e => { if (e.target.closest('.oqc-prob button')) markDirty(); });
+    const confirmDiscard = () => uiConfirm({ tone: 'danger', icon: '📝', title: t('o.discardT'),
+      message: esc(t('o.discardM')), ok: t('b.continue'), cancel: t('b.stay') });
+
+    function readNamed(root) {
+      const v = q => { const el = root.querySelector(q); return el ? el.value.trim() : ''; };
+      const lens = [];
+      root.querySelectorAll('.oqc-len tbody tr:not(.sec)').forEach(tr => {
+        const l = { no: Number(tr.querySelector('.no').textContent), position: tr.querySelector('[data-pos]').value.trim(),
+          spec: tr.querySelector('[data-spec]').value.trim(), samples: [...tr.querySelectorAll('input.smp')].map(i => i.value.trim()) };
+        if (l.position || l.spec || l.samples.some(Boolean)) lens.push(l);
+      });
+      const pressed = root.querySelector('.oqc-prob button[aria-pressed="true"]');
+      return {
+        checkDate: v('input[type="date"]'), customer: v('input[aria-label="CUSTOMER"]'), partNo: v('input[aria-label="PART №"]'),
+        lot: v('input[aria-label="LOT №"]'), qty: v('input[aria-label="QUANTITY"]'), spot: v('input[aria-label="SPOT CHECK"]'),
+        probability: pressed ? pressed.dataset.prob : '',
+        items: Object.fromEntries([...root.querySelectorAll('select.res')]
+          .filter(x => !x.closest('.oqc-len') && x.getAttribute('aria-label') !== 'Total determination')
+          .map(x => [x.getAttribute('aria-label').replace(/ result$/, ''), x.value])),
+        material: Object.fromEntries([...root.querySelectorAll('textarea[aria-label^="Material "]')]
+          .map(t => [t.getAttribute('aria-label').slice(9).toLowerCase(), t.value])),
+        lengths: lens, lengthResults: [...root.querySelectorAll('.oqc-len select.res')].map(x => x.value),
+        total: v('select[aria-label="Total determination"]'), remarks: v('textarea[aria-label="Remarks"]'),
+        checkedBy: v('input[aria-label="Checked by"]'), inspector: v('input[aria-label="Inspector"]')
+      };
+    }
+    function writeNamed(root, d) {
+      const set = (q, val) => { const el = root.querySelector(q); if (el && val != null) el.value = val; };
+      set('input[type="date"]', d.checkDate); set('input[aria-label="CUSTOMER"]', d.customer); set('input[aria-label="PART №"]', d.partNo);
+      set('input[aria-label="LOT №"]', d.lot); set('input[aria-label="QUANTITY"]', d.qty); set('input[aria-label="SPOT CHECK"]', d.spot);
+      setProbUI(root, d.probability || '');
+      root.querySelectorAll('select.res').forEach(x => {
+        const key = (x.getAttribute('aria-label') || '').replace(/ result$/, '');
+        if (d.items && key in d.items) x.value = d.items[key];
+      });
+      Object.entries(d.material || {}).forEach(([k, val]) => set(`textarea[aria-label="Material ${k[0].toUpperCase() + k.slice(1)}"]`, val));
+      root.querySelectorAll('.oqc-len input').forEach(i => { i.value = ''; });
+      (d.lengths || []).forEach(l => {
+        const tr = root.querySelector(`.oqc-len [data-pos="${l.no}"]`)?.closest('tr');
+        if (!tr) return;
+        tr.querySelector('[data-pos]').value = l.position || '';
+        tr.querySelector('[data-spec]').value = l.spec || '';
+        tr.querySelectorAll('input.smp').forEach((i, k) => { i.value = (l.samples || [])[k] || ''; });
+      });
+      root.querySelectorAll('.oqc-len select.res').forEach((x, k) => { x.value = (d.lengthResults || [])[k] || ''; });
+      set('select[aria-label="Total determination"]', d.total); set('textarea[aria-label="Remarks"]', d.remarks);
+      set('input[aria-label="Checked by"]', d.checkedBy); set('input[aria-label="Inspector"]', d.inspector);
+      root.querySelectorAll('select.res').forEach(x => { x.dataset.v = x.value; });
+    }
+    const pageClone = () => $('oqcForm').cloneNode(true);
+    function namedFromSnap(snap) { const t = pageClone(); applySnapshot(t, snap); return readNamed(t); }
+    function snapFromNamed(d) { const t = pageClone(); writeNamed(t, d); return { vals: fields(t).map(c => c.value), prob: d.probability || '' }; }
+    function pageComplete(snap) { const t = pageClone(); applySnapshot(t, snap); return !missingOn(t).length; }
+
+    async function saveRecord(forceId) {
+      if (!can((forceId || rec.id) ? 'daily.edit' : 'daily.add')) return msg(t('e.noPerm'));
+      pages[cur] = snapshot();
+      clearMissing();
+      const named = pages.map(namedFromSnap), h = named[0];
+      if (!h.lot) {
+        if (cur !== 0) goTo(0);
+        $('oqcLot').classList.add('missing'); $('oqcLot').focus();
+        return msg(t('o.needLot'));
+      }
+      const totals = named.map(n => n.total);
+      const body = {
+        lot: h.lot, box: rec.box, itemCode: rec.itemCode, partNo: h.partNo, customer: h.customer, checkDate: h.checkDate, qty: h.qty,
+        probability: h.probability, inspector: h.inspector, checkedBy: h.checkedBy,
+        total: totals.includes('NG') ? 'NG' : totals.length && totals.every(t => t === 'OK') ? 'OK' : '',
+        complete: pages.every(pageComplete), pages: named
+      };
+      const id = forceId || rec.id;
+      $('oqcSave').disabled = true;
+      try {
+        const out = await api(id ? 'PUT' : 'POST', id ? `/api/oqc/records/${id}` : '/api/oqc/records', body);
+        rec.id = out.id; dirty = false; setStatus();
+        msg(t('o.saved', { id: rec.id, lot: h.lot, box: rec.box ? `, Box ${rec.box}` : '', n: pages.length, state: t(body.complete ? 'st.complete' : 'o.draftLong') }), 'ok');
+        if (!$('oqcFind').hidden) findRecords();
+      } catch (err) {
+        if (err.status === 409 && err.data && err.data.existingId) {
+          const go = await uiConfirm({ tone: 'danger', icon: '🗂️', title: t('o.dupT'),
+            message: esc(t('o.dupM', { err: err.message, id: err.data.existingId })),
+            ok: t('b.replace'), cancel: t('b.cancel') });
+          if (go) return saveRecord(err.data.existingId);
+          return msg(t('o.notSaved'));
+        }
+        msg(err.message);
+      } finally { $('oqcSave').disabled = !canSave; }
+    }
+
+    async function loadRecord(id) {
+      const r = await api('GET', `/api/oqc/records/${id}`);
+      pages = r.pages.map(snapFromNamed);
+      cur = 0;
+      applySnapshot($('oqcForm'), pages[0]);
+      prob = pages[0].prob;
+      rec = { id: r.id, box: r.box, itemCode: r.itemCode };
+      dirty = false;
+      clearMissing();
+      showPages(); setStatus();
+      $('oqcScan').value = r.box ? `${r.lot}/${r.itemCode}/${r.qty ?? ''}/${r.box}` : '';
+      lastScan = $('oqcScan').value;
+      return r;
+    }
+
+    // Search panel
+    let findTimer = 0;
+    async function findRecords() {
+      try {
+        const list = await api('GET', `/api/oqc/records?q=${encodeURIComponent($('oqcFindQ').value.trim())}`);
+        $('oqcFindCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
+        const s2 = x => esc(String(x ?? ''));
+        $('oqcFindBody').innerHTML = list.map(r => `<tr class="${r.id === rec.id ? 'editing' : ''}">
+            <td class="num">${s2(r.lot)}</td><td>${s2(r.box)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
+            <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(r.checkDate)}</td><td class="num">${r.pageCount}</td>
+            <td><span class="pill ${r.complete ? 'done' : 'draft'}">${esc(t(r.complete ? 'st.complete' : 'st.draft'))}</span></td>
+            <td>${r.total ? `<span class="pill ${r.total === 'NG' ? 'ng' : 'ok'}">${r.total}</span>` : ''}</td>
+            <td class="meta">${s2(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
+            <td><div class="row-actions"><button class="icon-btn" data-open="${r.id}">${ico('folderOpen')}${T('b.open')}</button></div></td>
+          </tr>`).join('') || `<tr><td colspan="11" class="empty-row">${esc(t($('oqcFindQ').value.trim() ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
+      } catch (err) { msg(err.message); }
+    }
+    function toggleFind(open) {
+      $('oqcFind').hidden = !open;
+      $('oqcFindBtn').setAttribute('aria-expanded', open);
+      if (open) { findRecords(); $('oqcFindQ').focus(); }
+    }
+    $('oqcFindBtn').onclick = () => toggleFind($('oqcFind').hidden);
+    $('oqcFindClose').onclick = () => toggleFind(false);
+    $('oqcFindQ').addEventListener('input', () => { clearTimeout(findTimer); findTimer = setTimeout(findRecords, 300); });
+    $('oqcFindBody').onclick = async e => {
+      const b = e.target.closest('[data-open]'); if (!b) return;
+      const id = Number(b.dataset.open);
+      if (id !== rec.id && dirty && !await confirmDiscard()) return;
+      try {
+        const r = await loadRecord(id);
+        toggleFind(false);
+        msg(t('o.openedRec', { id: r.id, lot: r.lot, box: r.box ? `, Box ${r.box}` : '', state: t(r.complete ? 'st.complete' : 'st.draft') }), 'ok');
+        $('oqcForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) { msg(err.message); }
+    };
+    $('oqcSave').onclick = () => saveRecord();
+    setStatus();
+    langHook = () => { setStatus(); showPages(); if (!$('oqcFind').hidden) findRecords(); };
+    if (opts.scan) { $('oqcScan').value = opts.scan; scan(); }
+
+    $('oqcNew').onclick = async () => {
+      if (!await uiConfirm({ icon: '🧹', title: t('o.freshT'), message: esc(t('o.freshM')),
+        ok: t('b.clearIt'), cancel: t('b.keepEditing') })) return;
+      renderOQC(panel);
+    };
+  }
+
+  // Roving tabindex: only one tree item is in the tab order
+  function setRoving(n) {
+    treeEl.querySelectorAll('.node[tabindex="0"]').forEach(b => b.tabIndex = -1);
+    n.li.querySelector('.node').tabIndex = 0;
+  }
+
+  const visibleNodes = () => [...treeEl.querySelectorAll('li')]
+    .filter(li => li.offsetParent !== null && li.style.display !== 'none')
+    .map(li => nodesById[li.dataset.id]);
+
+  treeEl.addEventListener('click', e => {
+    const btn = e.target.closest('.node'); if (!btn) return;
+    const n = nodesById[btn.parentElement.dataset.id];
+    if (n.children && n.children.length) {
+      const open = n.li.getAttribute('aria-expanded') === 'true';
+      // Clicking the arrow only toggles; clicking the label opens and selects
+      if (e.target.closest('.chev')) return setExpanded(n, !open);
+      setExpanded(n, !open || state.selected !== n.id ? true : false);
+    }
+    select(n.id);
+  });
+
+  treeEl.addEventListener('keydown', e => {
+    const btn = e.target.closest('.node'); if (!btn) return;
+    const n = nodesById[btn.parentElement.dataset.id];
+    const vis = visibleNodes(), i = vis.indexOf(n);
+    const hasKids = n.children && n.children.length;
+    const open = n.li.getAttribute('aria-expanded') === 'true';
+    const focusNode = m => { if (m) { setRoving(m); m.li.querySelector('.node').focus(); } };
+    switch (e.key) {
+      case 'ArrowDown': focusNode(vis[i + 1]); break;
+      case 'ArrowUp': focusNode(vis[i - 1]); break;
+      case 'ArrowRight': if (hasKids) open ? focusNode(n.children[0]) : setExpanded(n, true); break;
+      case 'ArrowLeft': if (hasKids && open) setExpanded(n, false); else focusNode(n.parent); break;
+      case 'Home': focusNode(vis[0]); break;
+      case 'End': focusNode(vis[vis.length - 1]); break;
+      case 'Enter': case ' ': select(n.id, { focus: true }); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  document.getElementById('panel').addEventListener('click', e => {
+    const t = e.target.closest('[data-go]'); if (t) select(t.dataset.go);
+  });
+
+  document.getElementById('expandAll').onclick = () => Object.values(nodesById).forEach(n => setExpanded(n, true));
+  document.getElementById('collapseAll').onclick = () => Object.values(nodesById).forEach(n => setExpanded(n, false));
+
+  // Search: show matching items plus their parents, expanded
+  document.getElementById('filter').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    let any = false;
+    const walk = n => {
+      const self = !q || (STR[n.k] || [labelOf(n)]).some(x => x.toLowerCase().includes(q));   // matches either language
+      const kid = (n.children || []).map(walk).some(Boolean);
+      const show = self || kid;
+      n.li.style.display = show ? '' : 'none';
+      if (q && kid) n.li.setAttribute('aria-expanded', 'true');
+      if (!q && n.children && n.children.length) n.li.setAttribute('aria-expanded', state.open.includes(n.id));
+      const label = n.li.querySelector(':scope > .node .label');
+      const lbl = labelOf(n);
+      const at = q ? lbl.toLowerCase().indexOf(q) : -1;
+      label.innerHTML = at < 0 ? esc(lbl)
+        : esc(lbl.slice(0, at)) + '<mark>' + esc(lbl.slice(at, at + q.length)) + '</mark>' + esc(lbl.slice(at + q.length));
+      if (show) any = true;
+      return show;
+    };
+    treeData.forEach(walk);
+    document.getElementById('treeEmpty').style.display = any ? 'none' : 'block';
+  });
+
+  // Mobile drawer
+  // ☰: on phones the menu slides in/out; on desktop it hides/shows the menu column (remembered)
+  const NAV_KEY = 'qc-nav-hidden';
+  const phone = window.matchMedia('(max-width: 860px)');
+  const menuToggle = document.getElementById('menuToggle');
+  function syncToggle() {
+    const open = phone.matches ? document.body.classList.contains('nav-open') : !document.body.classList.contains('nav-hidden');
+    const label = t(open ? 't.hideMenu' : 't.showMenu');
+    menuToggle.setAttribute('aria-label', label);
+    menuToggle.title = label;
+    menuToggle.setAttribute('aria-expanded', open);
+  }
+  try { if (localStorage.getItem(NAV_KEY) === '1') document.body.classList.add('nav-hidden'); } catch {}
+  menuToggle.onclick = () => {
+    if (phone.matches) document.body.classList.toggle('nav-open');
+    else {
+      const hidden = document.body.classList.toggle('nav-hidden');
+      try { localStorage.setItem(NAV_KEY, hidden ? '1' : '0'); } catch {}
+    }
+    syncToggle();
+  };
+  phone.addEventListener('change', syncToggle);
+  new MutationObserver(syncToggle).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  syncToggle();
+  document.getElementById('scrim').onclick = () => document.body.classList.remove('nav-open');
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.body.classList.remove('nav-open'); });
+
+  // Language switch: update text in place (forms keep what was typed), then let lists/counters redraw
+  function setLang(l) {
+    LANG = l === 'en' ? 'en' : 'km';
+    try { localStorage.setItem(LANG_KEY, LANG); } catch {}
+    applyLang();
+    Object.values(nodesById).forEach(n => { const el = n.li && n.li.querySelector(':scope > .node .label'); if (el) el.textContent = labelOf(n); });
+    if (document.getElementById('filter').value) document.getElementById('filter').dispatchEvent(new Event('input'));
+    if (nodesById[state.selected]) renderHeader(nodesById[state.selected]);
+    syncToggle();
+    if (langHook) langHook();
+  }
+  document.querySelectorAll('.lang-switch button').forEach(b => b.onclick = () => setLang(b.dataset.lang));
+  applyLang();
+
+  document.getElementById('logout').onclick = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.replace('/');
+  };
+
+  if (window.APP_ENV && window.APP_ENV.showEnvBadge) {
+    const b = document.getElementById('envBadge');
+    b.textContent = window.APP_ENV.name; b.style.display = 'inline-block';
+  }
+
+  // Load the signed-in user, then build the menu for their role
+  let treeData = [], currentUser = null;
+  setBusy(true);
+  fetch('/api/me').finally(() => setBusy(false)).then(r => r.ok ? r.json() : Promise.reject()).then(u => {
+    currentUser = u;
+    document.getElementById('userName').textContent = u.username;
+    document.getElementById('userRole').textContent = [u.role, u.dept, u.id].filter(Boolean).join(' • ');
+    document.getElementById('avatar').textContent = (u.username || '?').trim().charAt(0).toUpperCase();
+    treeData = filterByPerm(MENU);
+    buildTree(treeData, treeEl, null, 1);
+    select(nodesById[state.selected] ? state.selected : 'dashboard');
+  }).catch(() => location.replace('/'));
+</script>
+</body>
+</html>
