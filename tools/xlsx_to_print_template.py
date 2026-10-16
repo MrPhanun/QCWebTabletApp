@@ -14,7 +14,7 @@ from openpyxl.utils import column_index_from_string, get_column_letter, range_bo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'Template Print Spec.xlsx')
-OUT = os.path.join(ROOT, 'spec-print.js')
+OUT = os.path.join(ROOT, 'public', 'js', 'spec-print.js')
 LAST_COL, LAST_ROW = 'AV', 43          # print area A1:AV43
 
 # Cell range -> (placeholder, CSS class for the filled value)

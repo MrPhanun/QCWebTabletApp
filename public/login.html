@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Dept App</title>
+<link rel="icon" href="/favicon.ico?v=2" type="image/x-icon">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/login.css">
+</head>
+<body>
+
+<div class="env-badge" id="envBadge"></div>
+<div class="orb o1"></div>
+<div class="orb o2"></div>
+<div class="orb o3"></div>
+<div class="orb o4"></div>
+
+<form class="card" id="loginForm" novalidate>
+  <div class="header">
+    <div class="avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9.500" cy="8" r="3.500"/>
+        <path d="M3 20c0-3.300 2.900-5.500 6.500-5.500"/>
+        <rect x="13.500" y="13" width="7.500" height="6.500" rx="1.800" fill="#fff" fill-opacity=".25"/>
+        <path d="M15.200 13v-1.300a2 2 0 0 1 4 0V13"/>
+      </svg>
+    </div>
+    <div>
+      <span class="app-name">QC Dept App</span>
+      <h1>Welcome back</h1>
+      <p>សូមស្វាគមន៍ត្រឡប់មកវិញ • Sign in to continue</p>
+    </div>
+  </div>
+
+  <label class="field">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.600-7 8-7s8 3 8 7"/></svg>
+    <input type="text" id="uid" placeholder="ID  •  អាយឌី" autocomplete="username" autofocus>
+  </label>
+
+  <label class="field">
+    <svg viewBox="0 0 24 24"><rect x="4" y="10.500" width="16" height="10" rx="3"/><path d="M8 10.500V8a4 4 0 0 1 8 0v2.500"/></svg>
+    <input type="password" id="pw" placeholder="Password  •  ពាក្យសម្ងាត់" autocomplete="current-password">
+    <button type="button" class="eye" aria-label="Show password" onclick="const p=document.getElementById('pw');p.type=p.type==='password'?'text':'password'">
+      <svg viewBox="0 0 24 24"><path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+  </label>
+
+  <div class="error" id="error" role="alert"></div>
+
+  <button class="btn" type="submit" id="loginBtn">
+    <span id="loginText">Login &nbsp;•&nbsp; ចូលប្រើ</span>
+    <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </button>
+</form>
+
+<script src="/config.js"></script>
+<script src="/js/login.js"></script>
+</body>
+</html>

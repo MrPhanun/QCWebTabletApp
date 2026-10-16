@@ -8,8 +8,8 @@ const JSZip = require('jszip');
 
 // OQC Data Information uses its own template (footer has Total Determination); the SPEC page uses the print template
 const TEMPLATES = {
-  oqc: path.join(__dirname, 'OQC Data.xlsx'),
-  spec: path.join(__dirname, 'Spec.xlsx')
+  oqc: path.join(__dirname, '..', 'templates', 'OQC Data.xlsx'),
+  spec: path.join(__dirname, '..', 'templates', 'Spec.xlsx')
 };
 const REQUIRED_SAMPLES = 3;   // same rule as the page: ①②③ required, ④⑤ optional
 const ROWS = 11;              // length rows per table (№ 1-11 left, 12-22 right)

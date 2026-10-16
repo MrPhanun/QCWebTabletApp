@@ -1,0 +1,100 @@
+const { sql, getPool } = require('../db');
+const { sendJson, readJson } = require('../http');
+
+// ---- SPEC master (MstSpec + MstSpecLength): per Part No material text and length SPEC rows ----
+const SPEC_TEXT = { customer: 100, wire: 1000, terminal: 1000, housing: 1000, other: 1000 };
+const SPEC_LINES = 22;
+
+function validateSpec(b) {
+  const r = { partNo: String(b.partNo || '').trim(), lengths: [] };
+  if (!r.partNo) return { error: 'Part No is required' };
+  if (r.partNo.length > 100) return { error: 'Part No must be 100 characters or less' };
+  for (const [k, max] of Object.entries(SPEC_TEXT)) {
+    r[k] = String(b[k] ?? '').trim();
+    if (r[k].length > max) return { error: `${k} must be ${max} characters or less` };
+  }
+  for (const l of Array.isArray(b.lengths) ? b.lengths : []) {
+    const no = Number(l.no), position = String(l.position ?? '').trim(), spec = String(l.spec ?? '').trim();
+    if (!position && !spec) continue;
+    if (!Number.isInteger(no) || no < 1 || no > SPEC_LINES) return { error: `Length № must be 1-${SPEC_LINES}` };
+    if (position.length > 50 || spec.length > 50) return { error: `Length № ${no}: Position and SPEC must be 50 characters or less` };
+    if (r.lengths.some(x => x.no === no)) return { error: `Length № ${no} is given twice` };
+    r.lengths.push({ no, position, spec });
+  }
+  return r;
+}
+
+// Insert (id = 0) or update the item and replace its length rows, all in one transaction
+async function saveSpec(id, r, userId) {
+  const tx = new sql.Transaction(await getPool());
+  await tx.begin();
+  try {
+    const head = await new sql.Request(tx)
+      .input('id', sql.Int, id)
+      .input('customer', sql.NVarChar(100), r.customer).input('partNo', sql.NVarChar(100), r.partNo).input('wire', sql.NVarChar(1000), r.wire)
+      .input('terminal', sql.NVarChar(1000), r.terminal).input('housing', sql.NVarChar(1000), r.housing)
+      .input('other', sql.NVarChar(1000), r.other).input('user', sql.VarChar(80), userId)
+      .query(`IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE PartNo = @partNo AND SysNo <> @id)
+          SELECT CAST(1 AS bit) AS dup, 0 AS rc, NULL AS newId
+        ELSE IF @id = 0 BEGIN
+          INSERT INTO MstSpec (Customer, PartNo, Wire, Terminal, Housing, Other, RegBy, UpdateBy)
+            VALUES (@customer, @partNo, @wire, @terminal, @housing, @other, @user, @user);
+          SELECT CAST(0 AS bit) AS dup, @@ROWCOUNT AS rc, CAST(SCOPE_IDENTITY() AS int) AS newId
+        END ELSE BEGIN
+          UPDATE MstSpec SET Customer=@customer, PartNo=@partNo, Wire=@wire, Terminal=@terminal, Housing=@housing, Other=@other,
+            UpdateBy=@user, UpdateDate=GETDATE() WHERE SysNo=@id;
+          SELECT CAST(0 AS bit) AS dup, @@ROWCOUNT AS rc, @id AS newId
+        END`);
+    const out = head.recordset[0];
+    if (out.dup || !out.rc) { await tx.rollback(); return out; }
+    await new sql.Request(tx).input('id', sql.Int, out.newId).query('DELETE FROM MstSpecLength WHERE SpecNo = @id');
+    for (const l of r.lengths) {
+      await new sql.Request(tx).input('id', sql.Int, out.newId).input('no', sql.TinyInt, l.no)
+        .input('position', sql.NVarChar(50), l.position).input('spec', sql.NVarChar(50), l.spec)
+        .query('INSERT INTO MstSpecLength (SpecNo, [LineNo], Position, Spec) VALUES (@id, @no, @position, @spec)');
+    }
+    await tx.commit();
+    return out;
+  } catch (err) {
+    await tx.rollback().catch(() => {});
+    throw err;
+  }
+}
+
+async function handleSpec(req, res, session, id) {
+  if (!session) return sendJson(res, 401, { error: 'Not logged in' });
+  try {
+    const pool = await getPool();
+    if (!id && req.method === 'GET') {
+      const heads = await pool.request().query(
+        `SELECT SysNo AS id, Customer AS customer, PartNo AS partNo, Wire AS wire, Terminal AS terminal, Housing AS housing, Other AS other,
+                UpdateBy AS updateBy, UpdateDate AS updateDate
+         FROM MstSpec ORDER BY PartNo`);
+      const lines = await pool.request().query(
+        'SELECT SpecNo AS specNo, [LineNo] AS no, Position AS position, Spec AS spec FROM MstSpecLength ORDER BY SpecNo, [LineNo]');
+      const byId = new Map(heads.recordset.map(h => [h.id, { ...h, lengths: [] }]));
+      for (const l of lines.recordset) byId.get(l.specNo)?.lengths.push({ no: l.no, position: l.position, spec: l.spec });
+      return sendJson(res, 200, [...byId.values()]);
+    }
+    if (req.method === 'POST' && !id || req.method === 'PUT' && id) {
+      let body;
+      try { body = await readJson(req); } catch { return sendJson(res, 400, { error: 'Invalid request' }); }
+      const r = validateSpec(body);
+      if (r.error) return sendJson(res, 400, r);
+      const out = await saveSpec(id || 0, r, session.id);
+      if (out.dup) return sendJson(res, 409, { error: `Part No ${r.partNo} already exists` });
+      if (!out.rc) return sendJson(res, 404, { error: 'This item no longer exists' });
+      return sendJson(res, id ? 200 : 201, { id: out.newId });
+    }
+    if (req.method === 'DELETE' && id) {
+      const { rowsAffected } = await pool.request().input('id', sql.Int, id).query('DELETE FROM MstSpec WHERE SysNo = @id');
+      return rowsAffected[0] ? sendJson(res, 200, { ok: true }) : sendJson(res, 404, { error: 'This item no longer exists' });
+    }
+    sendJson(res, 405, { error: 'Method not allowed' });
+  } catch (err) {
+    console.error('SPEC error:', err.message);
+    sendJson(res, 500, { error: 'Database error' });
+  }
+}
+
+module.exports = { handleSpec };

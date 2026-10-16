@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Dept App</title>
+<link rel="icon" href="/favicon.ico?v=2" type="image/x-icon">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/menu/base.css">
+<link rel="stylesheet" href="/css/menu/forms.css">
+<link rel="stylesheet" href="/css/menu/screens.css">
+<link rel="stylesheet" href="/css/menu/dialog.css">
+<link rel="stylesheet" href="/css/menu/shell.css">
+</head>
+<body>
+
+<div class="busy-bar" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Hide menu" title="Hide menu" aria-controls="sidebar" aria-expanded="true">
+    <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <div class="brand"><img src="/favicon.ico?v=2" alt=""> QC Dept App</div>
+  <span class="env-badge" id="envBadge"></span>
+  <div class="spacer"></div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Main menu">
+    <div class="tree-tools">
+      <label class="search">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="filter" type="search" placeholder="Search menu" data-tp="ph.menu">
+      </label>
+      <div class="tree-actions">
+        <button class="icon-btn" id="expandAll"><span class="bi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"/></svg></span><span data-t="b.expandAll">Expand all</span></button>
+        <button class="icon-btn" id="collapseAll"><span class="bi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="m7 4 5 5 5-5M7 20l5-5 5 5"/></svg></span><span data-t="b.collapseAll">Collapse all</span></button>
+      </div>
+    </div>
+    <ul class="tree" id="tree" role="tree"></ul>
+    <div class="tree-empty" id="treeEmpty" data-t="menu.empty">No menu items match.</div>
+    <!-- Bottom of the menu: language, signed-in user, logout -->
+    <div class="side-foot">
+      <div class="lang-switch" role="group" aria-label="Language / ភាសា">
+        <button type="button" data-lang="km" aria-pressed="false">ខ្មែរ</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <div class="user-row">
+        <div class="user">
+          <div class="avatar" id="avatar">?</div>
+          <div class="meta"><div class="name" id="userName">—</div><div class="role" id="userRole">—</div></div>
+        </div>
+        <button class="icon-btn" id="logout" title="Logout">
+          <span class="bi" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/></svg></span>
+          <span class="logout-text" data-t="b.logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+  <div class="scrim" id="scrim"></div>
+
+  <main class="content">
+    <div class="crumbs" id="crumbs"></div>
+    <h1 id="title"></h1>
+    <div class="panel" id="panel"></div>
+  </main>
+</div>
+
+<script src="/config.js"></script>
+<script src="/js/menu/icons.js"></script>
+<script src="/js/menu/i18n.js"></script>
+<script src="/js/menu/common.js"></script>
+<script src="/js/menu/tree.js"></script>
+<script src="/js/menu/screens/sampling.js"></script>
+<script src="/js/menu/screens/oqc-sheet.js"></script>
+<script src="/js/menu/screens/spec.js"></script>
+<script src="/js/menu/screens/users.js"></script>
+<script src="/js/menu/screens/roles.js"></script>
+<script src="/js/menu/screens/oqc.js"></script>
+<script src="/js/menu/app.js"></script>
+</body>
+</html>
