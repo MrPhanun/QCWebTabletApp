@@ -1,0 +1,39 @@
+/* In-app dialog (uiDialog in js/menu/common.js) */
+/* In-app dialog (replaces the browser's confirm/alert boxes) */
+.dlg-scrim {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px;
+  background: rgba(5,46,34,.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity .18s ease;
+}
+.dlg-scrim.show { opacity: 1; }
+.dlg {
+  width: min(100%, 400px); padding: 26px 24px 20px; border-radius: 28px; text-align: center;
+  background: linear-gradient(160deg, rgba(255,255,255,.96), rgba(240,253,247,.94));
+  border: 1px solid rgba(255,255,255,.9); box-shadow: 0 30px 70px -20px rgba(5,46,34,.45), 0 0 0 1px rgba(5,150,105,.08);
+  transform: translateY(14px) scale(.94); transition: transform .28s cubic-bezier(.34,1.56,.64,1);
+}
+.dlg-scrim.show .dlg { transform: none; }
+.dlg-ic {
+  width: 64px; height: 64px; margin: -4px auto 14px; border-radius: 22px; display: grid; place-items: center; font-size: 30px;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0); box-shadow: 0 10px 24px -10px rgba(5,150,105,.6); transform: rotate(-6deg);
+}
+.dlg.danger .dlg-ic { background: linear-gradient(135deg, #fee2e2, #fecaca); box-shadow: 0 10px 24px -10px rgba(220,38,38,.55); }
+.dlg.info .dlg-ic { background: linear-gradient(135deg, #fef3c7, #fde68a); box-shadow: 0 10px 24px -10px rgba(217,119,6,.5); }
+.dlg h2 { font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; }
+.dlg p { font-size: 14.5px; line-height: 1.5; color: var(--ink-soft); overflow-wrap: anywhere; }
+.dlg p b { color: var(--ink); }
+.dlg p:has(br) { text-align: left; max-height: 50vh; overflow-y: auto; }
+.dlg-actions { display: flex; gap: 10px; margin-top: 22px; }
+.dlg-btn {
+  flex: 1; height: 46px; border-radius: 16px; cursor: pointer; font-family: inherit; font-size: 14.5px; font-weight: 800;
+  transition: transform .15s, box-shadow .2s, background .2s;
+}
+.dlg-btn:active { transform: scale(.97); }
+.dlg-btn:focus-visible { outline: 3px solid rgba(5,150,105,.35); outline-offset: 2px; }
+.dlg-btn.ghost { background: rgba(5,150,105,.08); border: 1.5px solid transparent; color: var(--ink); }
+.dlg-btn.ghost:hover { background: rgba(5,150,105,.14); }
+.dlg-btn.go { border: 0; color: #fff; background: linear-gradient(110deg, var(--accent-1), var(--accent-2)); box-shadow: 0 12px 22px -10px rgba(5,150,105,.75); }
+.dlg.danger .dlg-btn.go { background: linear-gradient(110deg, #dc2626, #fb7185); box-shadow: 0 12px 22px -10px rgba(220,38,38,.7); }
+.dlg.danger .dlg-btn:focus-visible { outline-color: rgba(220,38,38,.35); }
+.dlg-btn.go:hover { box-shadow: 0 16px 26px -10px rgba(5,150,105,.85); transform: translateY(-1px); }
+@media print { .dlg-scrim { display: none !important; } }
