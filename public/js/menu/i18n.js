@@ -86,6 +86,8 @@ const STR = {
   'sc.delM': ['Part No <b>{code}</b>{part} and all its length lines will be gone for good.', 'Part No <b>{code}</b>{part} និងបន្ទាត់ប្រវែងទាំងអស់របស់វា នឹងត្រូវលុបជាអចិន្ត្រៃយ៍។'],
   'sc.deleted': ['Deleted {code}', 'បានលុប {code}'], 'sc.needCode': ['Enter the Part No', 'សូមបញ្ចូល Part No'],
   'sc.saved': ['Saved {code}', 'បានរក្សាទុក {code}'], 'sc.added': ['Added {code}', 'បានបន្ថែម {code}'],
+  'sc.maxPages': ['A SPEC can have up to {n} pages', 'SPEC មួយអាចមានរហូតដល់ {n} ទំព័រ'],
+  'sc.removeM': ['The length lines on this page will be removed and the later pages move up one page.', 'បន្ទាត់ប្រវែងនៅលើទំព័រនេះនឹងត្រូវលុប ហើយទំព័របន្ទាប់នឹងឡើងមកមួយទំព័រ។'],
   // OQC Data Information
   'ph.scan': ['Scan label barcode', 'ស្កេនបាកូដ'], 'ph.badge': ['Scan badge or type', 'ស្កេនកាត ឬវាយបញ្ចូល'],
   'ph.find': ['Search Lot, Box, Item Code, Part No, Customer, Inspector…', 'ស្វែងរក Lot, Box, លេខកូដទំនិញ, Part No, អតិថិជន, អ្នកត្រួតពិនិត្យ…'],
@@ -101,8 +103,14 @@ const STR = {
   'o.badCode': ['Hmm, "{code}" isn\'t a label code. Scan the Barcode on the label — it looks like 26-0700394/8802/4500/002', 'អូ "{code}" មិនមែនជាបាកូដទេ។ សូមស្កេន Barcode នៅលើស្លាក — វាមានទម្រង់ដូចជា 26-0700394/8802/4500/002'],
   'o.openedSaved': ['Opened saved record — Lot {lot}, Box {box} ({state}, saved by {by} {date}). Change what you need and Save to update.', 'បានបើកកំណត់ត្រាដែលបានរក្សាទុក — Lot {lot}, Box {box} ({state}, រក្សាទុកដោយ {by} {date})។ កែប្រែតាមត្រូវការ ហើយចុច រក្សាទុក ដើម្បីធ្វើបច្ចុប្បន្នភាព។'],
   'o.scanned': ['Scanned Lot {lot}, Box {box}, Item Code {item}', 'បានស្កេន Lot {lot}, Box {box}, លេខកូដទំនិញ {item}'],
-  'o.enterPart': ['Enter the Part No to fill Customer and SPEC', 'សូមបញ្ចូល Part No ដើម្បីបំពេញ អតិថិជន និង SPEC'],
+  'o.delT': ['Delete this record?', 'លុបកំណត់ត្រានេះ?'],
+  'o.delM': ['<b>{label}</b> and all its pages will be deleted. This cannot be undone.', '<b>{label}</b> និងទំព័រទាំងអស់របស់វានឹងត្រូវលុប។ មិនអាចយកមកវិញបានទេ។'],
+  'o.deleted': ['Deleted {label}', 'បានលុប {label}'],
+  'o.labelFound':['Part No {part}, Qty {qty} from Marunix', 'Part No {part} ចំនួន {qty} ពី Marunix'],
+  'o.labelMissing': ['Label {lot} / {item} / Box {box} is not in Marunix — Lot and Qty are taken from the barcode', 'រកមិនឃើញស្លាក {lot} / {item} / Box {box} ក្នុង Marunix ទេ — Lot និងចំនួន យកពីបាកូដ'],
+  'o.enterPart':['Enter the Part No to fill Customer and SPEC', 'សូមបញ្ចូល Part No ដើម្បីបំពេញ អតិថិជន និង SPEC'],
   'o.specFound': ['SPEC of Part No {part} filled', 'បានបំពេញ SPEC របស់ Part No {part}'], 'o.lines': ['{n} length lines', '{n} បន្ទាត់ប្រវែង'],
+  'o.specPages': ['{n} pages (22 lines each)', '{n} ទំព័រ (22 បន្ទាត់ក្នុងមួយទំព័រ)'],
   'o.noSpec': ['No SPEC for Part No {part} — add it in Master Data › SPEC', 'គ្មាន SPEC សម្រាប់ Part No {part} — សូមបន្ថែមនៅ ទិន្នន័យមេ › SPEC'],
   'o.badge': ['{field}: {name} (ID {id})', '{field}៖ {name} (ID {id})'],
   'o.pageAdded': ['Page {n} added — copied from page {from} without the Length Check', 'បានបន្ថែមទំព័រ {n} — ចម្លងពីទំព័រ {from} ដោយគ្មានការត្រួតពិនិត្យប្រវែង'],
@@ -147,9 +155,17 @@ function applyLang(root = document) {
 const FIELD_KM = {
   'Check date': 'ថ្ងៃត្រួតពិនិត្យ', CUSTOMER: 'អតិថិជន', 'PART №': 'ឈ្មោះផលិតផល', 'LOT №': 'លេខឡត', QUANTITY: 'ចំនួនផលិត',
   'SPOT CHECK': 'ចំនួនចាប់ត្រួតពិនិត្យ', Probability: 'ប្រូបាបចាប់ពិនិត្យ', 'Material check': 'ត្រួតពិនិត្យវត្ថុធាតុដើម',
+  'Material Wire': 'វត្ថុធាតុដើម ខ្សែ', 'Material Terminal': 'វត្ថុធាតុដើម ធឺរមីណល', 'Material Housing': 'វត្ថុធាតុដើម ហៅស៊ីង', 'Material Other': 'វត្ថុធាតុដើម ផ្សេងៗ',
   'Length Check result': 'លទ្ធផលត្រួតពិនិត្យប្រវែង', 'Total Determination': 'សរុបលទ្ធផល', 'Checked by': 'ត្រួតពិនិត្យដោយ', Inspector: 'អ្នកត្រួតពិនិត្យ'
 };
-const fieldName = en => LANG === 'km' ? (FIELD_KM[en] || (OQC_ITEMS.find(i => i[1] === en) || [])[0]?.replace(/^\d+\)\s*/, '') || en) : en;
+const fieldName = en => LANG === 'km' ? (FIELD_KM[en] || (OQC_ITEMS.find(i => i[1] === en) || [])[0]?.replace(/^(?:\d+\)|[①-⑨])\s*/, '') || en) : en;
+// Field names inside server messages ("Lot № must be 50 characters or less")
+const SERVER_FIELD_KM = {
+  'Lot №': 'លេខឡត', Box: 'ប្រអប់', 'Item Code': 'Item Code', 'Part №': 'ឈ្មោះផលិតផល', 'Part No': 'Part No', Customer: 'អតិថិជន',
+  customer: 'អតិថិជន', wire: 'ខ្សែ', terminal: 'ធឺរមីណល', housing: 'ហៅស៊ីង', other: 'ផ្សេងៗ',
+  Probability: 'ប្រូបាបចាប់ពិនិត្យ', Total: 'សរុបលទ្ធផល', Inspector: 'អ្នកត្រួតពិនិត្យ', 'Checked by': 'ត្រួតពិនិត្យដោយ',
+  Username: 'ឈ្មោះអ្នកប្រើ', Department: 'ផ្នែក', Password: 'ពាក្យសម្ងាត់'
+};
 // Server messages are English; show them in Khmer when Khmer is chosen
 const SERVER_KM = [
   [/^Not logged in$/, 'មិនទាន់បានចូលប្រើ'], [/^Session expired$/, 'វគ្គប្រើប្រាស់បានផុតកំណត់'], [/^Database error$/, 'បញ្ហាមូលដ្ឋានទិន្នន័យ'],
@@ -173,7 +189,19 @@ const SERVER_KM = [
   [/^ID must be 1 to 10 .*$/, 'ID ត្រូវមាន 1 ដល់ 10 តួអក្សរ (អក្សរ លេខ . - _)'],
   [/^Username is required$/, 'ត្រូវការឈ្មោះអ្នកប្រើ'], [/^Password is required$/, 'ត្រូវការពាក្យសម្ងាត់'],
   [/^Role must be Admin or User$/, 'តួនាទីត្រូវតែជា Admin ឬ User'],
-  [/^(Username|Department|Password) must be (\d+) characters or less$/, '$1 ត្រូវមិនលើសពី $2 តួអក្សរ'],
+  [/^([^:]+) must be (\d+) characters or less$/, (m, f, n) => `${SERVER_FIELD_KM[f] || f} ត្រូវមិនលើសពី ${n} តួអក្សរ`],
+  [/^Total must be OK or NG$/, 'សរុបលទ្ធផលត្រូវតែជា OK ឬ NG'],
+  [/^Length № must be 1-(\d+)$/, 'លេខប្រវែង № ត្រូវនៅចន្លោះ 1-$1'],
+  [/^Length № (\d+): Position and SPEC must be (\d+) characters or less$/, 'ប្រវែង № $1: ទីតាំង និង SPEC ត្រូវមិនលើសពី $2 តួអក្សរ'],
+  [/^Length № (\d+): SPEC - and \+ must be (\d+) characters or less$/, 'ប្រវែង № $1: SPEC - និង + ត្រូវមិនលើសពី $2 តួអក្សរ'],
+  [/^Length № (\d+) is given twice$/, 'ប្រវែង № $1 ត្រូវបានបញ្ចូលពីរដង'],
+  [/^Level must be Normal or Strict$/, 'កម្រិតត្រូវតែជា Normal ឬ Strict'],
+  [/^Shipment Qty From and To must be whole numbers of 1 or more$/, 'Shipment Qty ពី និង ដល់ ត្រូវតែជាចំនួនគត់ចាប់ពី 1 ឡើងទៅ'],
+  [/^Shipment Qty "To" must be greater than or equal to "From"$/, 'Shipment Qty "ដល់" ត្រូវធំជាង ឬស្មើ "ពី"'],
+  [/^Inspection All Qty must be a whole number of 1 or more$/, 'Inspection All Qty ត្រូវតែជាចំនួនគត់ចាប់ពី 1 ឡើងទៅ'],
+  [/^Give level \(Normal or Strict\) and qty \(whole number\)$/, 'សូមផ្តល់កម្រិត (Normal ឬ Strict) និងចំនួន (ចំនួនគត់)'],
+  [/^Method not allowed$/, 'មិនអនុញ្ញាតសកម្មភាពនេះទេ'], [/^Not found$/, 'រកមិនឃើញ'],
+  [/^Please enter ID and password$/, 'សូមបញ្ចូលអាយឌី និងពាក្យសម្ងាត់'], [/^Incorrect ID or password$/, 'អាយឌី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ'],
   [/^You cannot delete your own user$/, 'អ្នកមិនអាចលុបអ្នកប្រើរបស់ខ្លួនឯងបានទេ'],
   [/^This user no longer exists$/, 'អ្នកប្រើនេះលែងមានទៀតហើយ'],
   [/^Could not create the Excel file$/, 'មិនអាចបង្កើតឯកសារ Excel បានទេ'],

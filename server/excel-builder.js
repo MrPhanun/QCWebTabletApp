@@ -18,8 +18,12 @@ const ROWS = 11;              // length rows per table (№ 1-11 left, 12-22 rig
 const LEFT = { pos: ['C', 'G'], spec: ['H', 'J'], samples: [['K', 'L'], ['M', 'O'], ['P', 'R'], ['S', 'U'], ['V', 'X']], result: ['K', 'X'] };
 const RIGHT = { pos: ['AA', 'AE'], spec: ['AF', 'AH'], samples: [['AI', 'AJ'], ['AK', 'AM'], ['AN', 'AP'], ['AQ', 'AS'], ['AT', 'AV']], result: ['AI', 'AV'] };
 const FIRST_LEN_ROW = 30, RESULT_ROW = 41;
-const ITEM_ROWS = [9, 11, 13, 15, 17, 19, 21, 23, 25];   // items 3) .. 11), two rows each
-const MATERIAL = { wire: 'C12:AE14', terminal: 'C16:AE18', housing: 'C20:AE23', other: 'C25:AE26' };
+const ITEM_ROWS = [9, 11, 13, 15, 17, 19, 21, 23, 25];   // 3) INSPECTION POINT ① .. ⑨, two rows each
+// 1) MATERIAL CHECK: text area under each label (left of the Result column) and that material's Result cell
+const MATERIAL = { wire: 'C10:AB12', terminal: 'C14:AB17', housing: 'C19:AB22', other: 'C24:AB26' };
+const MATERIAL_RESULT = { wire: 'AC9', terminal: 'AC13', housing: 'AC18', other: 'AC23' };
+// Saved result key of one material (the page's "Material Wire result" select, ...)
+const materialKey = k => 'Material ' + k[0].toUpperCase() + k.slice(1);
 // SPEC and OQC templates: the material text goes into the text box with one of these shape names (any letter case).
 // A box missing from the template falls back to the first cell of its MATERIAL range.
 const SPEC_TEXTBOX = { wire: ['Wire', 'TextBox 11'], terminal: ['Terminal', 'TextBox 14'], housing: ['Housing', 'TextBox 12'], other: ['Other', 'TextBox 13'] };
@@ -27,18 +31,20 @@ const SPEC_TEXTBOX = { wire: ['Wire', 'TextBox 11'], terminal: ['Terminal', 'Tex
 const colNum = c => c.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
 const colLetter = n => { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
 
-// Same SPEC formats as the page: "100±2", "100+2/-1", "98-102", "1~3mm"
+// Same SPEC formats as the page: "100±2", "100+2/-1", "100 (+10/-5)", "98-102", "1~3mm"
 function parseSpec(s) {
   const N = '(-?\\d+(?:\\.\\d+)?)';
   const t = String(s || '').replace(/\s*mm\s*$/i, '');
   let m;
   if ((m = t.match(new RegExp(`^\\s*${N}\\s*±\\s*${N}\\s*$`)))) return [+m[1] - +m[2], +m[1] + +m[2]];
-  if ((m = t.match(new RegExp(`^\\s*${N}\\s*\\+\\s*${N}\\s*/?\\s*-\\s*${N}\\s*$`)))) return [+m[1] - +m[3], +m[1] + +m[2]];
+  if ((m = t.match(new RegExp(`^\\s*${N}\\s*\\(?\\s*\\+\\s*${N}\\s*/?\\s*-\\s*${N}\\s*\\)?\\s*$`)))) return [+m[1] - +m[3], +m[1] + +m[2]];
   if ((m = t.match(new RegExp(`^\\s*${N}\\s*[-~–]\\s*${N}\\s*$`)))) return [Math.min(+m[1], +m[2]), Math.max(+m[1], +m[2])];
   return null;
 }
-const isNg = (value, spec) => {
-  const range = parseSpec(spec);
+// OK / NG of one sample: against the line's Range ("8-12", from the SPEC master) or else its SPEC text
+const isNg = (value, l) => {
+  const r = String(l.range || '').match(/^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/);
+  const range = r ? [+r[1], +r[2]] : parseSpec(l.spec);
   if (!range || String(value).trim() === '') return false;
   const n = Number(value);
   return !Number.isFinite(n) || n < range[0] - 1e-9 || n > range[1] + 1e-9;
@@ -88,26 +94,24 @@ function fillPage(ws, d, itemList, kind, boxes = new Set()) {
   put(ws, 'AB7', asNum(d.qty), { shrink: true });
   put(ws, 'AI7', asNum(d.spot), { shrink: true });
   put(ws, 'AP7', d.probability, { shrink: true });
-  put(ws, 'S9', d.partNo, { shrink: true });
 
-  // 1) Material check: result + text under Wire / Terminal / Housing / Other
+  // 1) Material check: Wire / Terminal / Housing / Other, each with its text and result
+  // (records saved before the per-material results have one 'Material check' result for all four)
   const items = d.items || {};
-  put(ws, 'AC9', items['Material check'] || '', { color: items['Material check'] === 'NG' ? RED : undefined });
+  for (const [k, addr] of Object.entries(MATERIAL_RESULT)) {
+    const v = items[materialKey(k)] ?? items['Material check'] ?? '';
+    put(ws, addr, v, { align: 'center', valign: 'middle', color: v === 'NG' ? RED : undefined });
+  }
   for (const [k, range] of Object.entries(MATERIAL)) {
     if (boxes.has(k)) continue;   // goes into the template's text box instead (addTextBoxes)
     merge(ws, range);
     put(ws, range.split(':')[0], (d.material || {})[k] || '', { align: 'left', valign: 'top', wrap: true });
   }
 
-  // Items 3) .. 11): the labels follow the current form (text only, template fonts kept); results in AT:AV
-  itemList.forEach(([km, en], i) => {
+  // 3) Inspection point ① .. ⑨: labels as printed on the template (same order as itemList); results in AT:AV
+  itemList.forEach(([, en], i) => {
     const r = ITEM_ROWS[i];
     if (!r) return;
-    const [, no, kmText] = String(km).match(/^(\d+\))\s*(.*)$/) || [null, '', km];
-    ws.getCell(`AF${r}`).value = no;
-    ws.getCell(`AG${r}`).value = kmText;
-    merge(ws, `AG${r + 1}:AS${r + 1}`);
-    put(ws, `AG${r + 1}`, `[${en}]`, { shrink: true });   // long names (e.g. RoHS) fit the box like the template's row 24
     merge(ws, `AT${r}:AV${r + 1}`);
     put(ws, `AT${r}`, items[en] || '', { align: 'center', valign: 'middle', color: items[en] === 'NG' ? RED : undefined });
   });
@@ -121,7 +125,7 @@ function fillPage(ws, d, itemList, kind, boxes = new Set()) {
     const used = lines.filter(l => String(l.spec || '').trim());
     const extra = lines.some(l => (l.samples || []).slice(REQUIRED_SAMPLES).some(v => String(v || '').trim()));
     const slash = used.length > 0 && !extra && used.every(l =>
-      [0, 1, 2].every(k => String((l.samples || [])[k] || '').trim() && !isNg(l.samples[k], l.spec)));
+      [0, 1, 2].every(k => String((l.samples || [])[k] || '').trim() && !isNg(l.samples[k], l)));
 
     lines.forEach((l, i) => {
       const r = FIRST_LEN_ROW + i;
@@ -131,7 +135,7 @@ function fillPage(ws, d, itemList, kind, boxes = new Set()) {
         if (slash && k >= REQUIRED_SAMPLES) return;
         merge(ws, `${c1}${r}:${c2}${r}`);
         const v = (l.samples || [])[k] || '';
-        put(ws, `${c1}${r}`, asNum(v), { align: 'center', color: isNg(v, l.spec) ? RED : undefined });
+        put(ws, `${c1}${r}`, asNum(v), { align: 'center', color: isNg(v, l) ? RED : undefined });
       });
     });
     if (slash) {
@@ -141,9 +145,24 @@ function fillPage(ws, d, itemList, kind, boxes = new Set()) {
       ownStyle(ws.getCell(`${c1}${FIRST_LEN_ROW}`)).border = { top: thin, left: thin, bottom: thin, right: thin,
         diagonal: { up: true, down: false, style: 'thin', color: { argb: 'FF000000' } } };
     }
+    // Result row: one result under each sample ① .. ⑤ (records saved before that have one result for the whole table)
     const res = (d.lengthResults || [])[t] || '';
-    merge(ws, `${side.result[0]}${RESULT_ROW}:${side.result[1]}${RESULT_ROW}`);
-    put(ws, `${side.result[0]}${RESULT_ROW}`, res, { align: 'center', color: res === 'NG' ? RED : undefined });
+    const thin = { style: 'thin', color: { argb: 'FF000000' } };
+    if (Array.isArray(res)) {
+      side.samples.forEach(([c1, c2], k) => {
+        merge(ws, `${c1}${RESULT_ROW}:${c2}${RESULT_ROW}`);
+        const v = res[k] || '';
+        put(ws, `${c1}${RESULT_ROW}`, v, { align: 'center', valign: 'middle', color: v === 'NG' ? RED : undefined });
+        // Same font in all ten result cells (the template's AI41 has a bigger one); a line between the samples
+        const cell = ws.getCell(`${c1}${RESULT_ROW}`);
+        const { color, ...font } = ws.getCell(`${LEFT.samples[0][0]}${RESULT_ROW}`).font || {};
+        cell.font = { ...font, ...(v === 'NG' ? { color: { argb: RED } } : {}) };
+        cell.border = { ...cell.border, left: thin, right: thin };
+      });
+    } else {
+      merge(ws, `${side.result[0]}${RESULT_ROW}:${side.result[1]}${RESULT_ROW}`);
+      put(ws, `${side.result[0]}${RESULT_ROW}`, res, { align: 'center', color: res === 'NG' ? RED : undefined });
+    }
   });
 
   // Footer: remarks, total determination (OQC template only), checked by, inspector
@@ -184,6 +203,15 @@ async function templateWithPages(file, count) {
 // (as saved by OQC Data Information); itemList: [[Khmer, English], ...] for items 3)-11)
 async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
   if (kind === 'spec') return buildSpecWorkbook(pages);
+  // Pages 2, 3, ... (SPEC lines 23-44, 45-66, ...) show "/" for the Wire / Terminal / Housing / Other text and results;
+  // on page 1 a material whose result is "/" (not used) shows "/" as its text too
+  pages = pages.map((d, i) => {
+    const items = { ...(d.items || {}) };
+    if (i > 0) Object.keys(MATERIAL).forEach(k => { items[materialKey(k)] = '/'; });
+    const material = Object.fromEntries(Object.keys(MATERIAL).map(k =>
+      [k, items[materialKey(k)] === '/' ? '/' : (d.material || {})[k] || '']));
+    return { ...d, items, material };
+  });
   const tpl = await JSZip.loadAsync(fs.readFileSync(TEMPLATES.oqc));
   const drawingFile = tpl.file('xl/drawings/drawing1.xml');
   const drawing = drawingFile ? await drawingFile.async('string') : '';
@@ -198,7 +226,7 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
     Object.assign(ws.pageSetup, { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, scale: 100 });
   });
   const buf = await wb.xlsx.writeBuffer();
-  return drawing ? addTextBoxes(buf, drawing, pages) : buf;
+  return stackPages(drawing ? await addTextBoxes(buf, drawing, pages) : buf, pages[0].partNo);
 }
 
 // exceljs drops shapes it can't read, so give every sheet its own copy of the template's drawing
@@ -288,7 +316,6 @@ function fillTextBox(xml, names, text) {
 function fillSpecSheet(sheet, d) {
   sheet = setCell(sheet, 'A7', d.customer);
   sheet = setCell(sheet, 'I7', d.partNo);
-  sheet = setCell(sheet, 'S9', d.partNo);
   const byNo = new Map((d.lengths || []).map(l => [Number(l.no), l]));
   [LEFT, RIGHT].forEach((side, t) => {
     for (let i = 0; i < ROWS; i++) {
@@ -359,6 +386,122 @@ async function buildSpecWorkbook(pages) {
   });
   zip.file('xl/workbook.xml', wb);
   zip.file('xl/_rels/workbook.xml.rels', wbRels);
+  zip.file('[Content_Types].xml', types);
+  return stackPages(await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }), pages[0].partNo);
+}
+
+// ---- All pages on one worksheet, like the paper files (e.g. "KM (ADXDN ).xlsx"): page 1 is rows 1-43, page 2 rows 44-86, ...
+// Takes a workbook whose sheets are the pages (each filled from the 43-row template, with its own text boxes) and moves
+// every page's rows, merges and text boxes onto the first sheet, 43 rows further down per page, with a page break
+// after each page and one print area. The sheet is named after the Part No.
+const PAGE_ROWS = 43, LAST_COL = 48;   // template print area A1:AV43
+const A4 = { w: 595.3, h: 841.9 };     // points
+
+async function stackPages(buf, sheetName) {
+  const zip = await JSZip.loadAsync(buf);
+  const read = p => zip.file(p).async('string');
+  let wb = await read('xl/workbook.xml'), wbRels = await read('xl/_rels/workbook.xml.rels'), types = await read('[Content_Types].xml');
+  const relTag = (rels, id) => rels.match(new RegExp(`<Relationship\\b[^>]*\\bId="${id}"[^>]*/>`))[0];
+  const target = (tag, dir) => path.posix.normalize(dir + '/' + tag.match(/Target="([^"]+)"/)[1]).replace(/^\/?/, '');
+  const pages = await Promise.all([...wb.matchAll(/<sheet\b[^>]*\br:id="([^"]+)"[^>]*\/>/g)].map(async m => {
+    const rel = relTag(wbRels, m[1]);
+    const sheetPath = target(rel, 'xl').replace(/^xl\/xl\//, 'xl/');
+    const relsPath = sheetPath.replace(/([^/]+)$/, '_rels/$1.rels');
+    const rels = zip.file(relsPath) ? await read(relsPath) : '';
+    const sheet = await read(sheetPath);
+    const drawingId = (sheet.match(/<drawing r:id="([^"]+)"/) || [])[1];
+    const drawingPath = drawingId ? target(relTag(rels, drawingId), path.posix.dirname(sheetPath)) : '';
+    return { tag: m[0], relId: m[1], relTag: rel, sheetPath, relsPath, rels, sheet, drawingPath, drawing: drawingPath ? await read(drawingPath) : '' };
+  }));
+  const n = pages.length, first = pages[0];
+
+  // Rows, cells and merges of each page, moved down by 43 rows per page (template rows below 43 are left out)
+  const rowOf = ref => +ref.match(/\d+/)[0];
+  const shift = (ref, by) => ref.replace(/([A-Z]+)(\d+)/g, (m, c, r) => c + (+r + by));
+  let rows = '', merges = [], anchors = [];
+  pages.forEach((p, i) => {
+    const by = i * PAGE_ROWS;
+    const data = (p.sheet.match(/<sheetData>([\s\S]*?)<\/sheetData>/) || [])[1] || '';
+    rows += (data.match(/<row\b[^>]*?(?:\/>|>[\s\S]*?<\/row>)/g) || [])
+      .filter(r => +r.match(/<row r="(\d+)"/)[1] <= PAGE_ROWS)
+      .map(r => r.replace(/<row r="(\d+)"/, (m, x) => `<row r="${+x + by}"`).replace(/<c r="([A-Z]+\d+)"/g, (m, ref) => `<c r="${shift(ref, by)}"`))
+      .join('');
+    merges.push(...[...p.sheet.matchAll(/<mergeCell ref="([^"]+)"\/>/g)].map(m => m[1])
+      .filter(ref => rowOf(ref) <= PAGE_ROWS).map(ref => shift(ref, by)));
+    anchors.push(...(p.drawing.match(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g) || [])
+      .map(a => a.replace(/<xdr:row>(\d+)<\/xdr:row>/g, (m, r) => `<xdr:row>${+r + by}</xdr:row>`)
+        .replace(/<a:extLst>(?:(?!<\/a:extLst>)[\s\S])*?a16:creationId[\s\S]*?<\/a:extLst>/g, '')));
+  });
+  let id = 1;
+  anchors = anchors.map(a => a.replace(/(<xdr:cNvPr\b[^>]*\bid=")\d+"/g, (m, head) => `${head}${++id}"`));
+
+  // One print page per 43 rows: no fit-to-page (Excel ignores page breaks with it); one scale that fits a page on A4
+  const sheet0 = first.sheet;
+  const widths = Array(LAST_COL + 1).fill(+(sheet0.match(/<sheetFormatPr\b[^>]*defaultColWidth="([\d.]+)"/) || [, 9])[1]);
+  for (const m of sheet0.matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bwidth="([\d.]+)"[^>]*\/>/g)) {
+    for (let c = +m[1]; c <= Math.min(+m[2], LAST_COL); c++) widths[c] = +m[3];
+  }
+  const hidden = new Set([...sheet0.matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bhidden="1"/g)].flatMap(m => Array.from({ length: m[2] - m[1] + 1 }, (_, k) => +m[1] + k)));
+  let wPt = 0;
+  for (let c = 1; c <= LAST_COL; c++) if (!hidden.has(c)) wPt += Math.trunc((256 * widths[c] + Math.trunc(128 / 7)) / 256 * 7) * 0.75;
+  const defH = +(sheet0.match(/<sheetFormatPr\b[^>]*defaultRowHeight="([\d.]+)"/) || [, 15])[1];
+  const heights = {};
+  for (const m of sheet0.matchAll(/<row r="(\d+)"[^>]*?\bht="([\d.]+)"/g)) heights[m[1]] = +m[2];
+  let hPt = 0;
+  for (let r = 1; r <= PAGE_ROWS; r++) hPt += heights[r] ?? defH;
+  const mg = sheet0.match(/<pageMargins\b[^>]*\/>/);
+  const margin = k => +((mg && mg[0].match(new RegExp(`\\b${k}="([\\d.]+)"`))) || [, 0])[1] * 72;
+  const tplScale = +(sheet0.match(/<pageSetup\b[^>]*\bscale="(\d+)"/) || [, 100])[1];
+  const scale = Math.max(10, Math.min(tplScale, Math.floor(100 * Math.min(
+    (A4.w - margin('left') - margin('right')) / wPt, (A4.h - margin('top') - margin('bottom')) / hPt))));
+
+  const last = PAGE_ROWS * n;
+  let sheet = sheet0
+    .replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:${colLetter(LAST_COL)}${last}"/>`)
+    .replace(/<sheetData>[\s\S]*?<\/sheetData>|<sheetData\/>/, `<sheetData>${rows}</sheetData>`)
+    .replace(/<mergeCells\b[^>]*>[\s\S]*?<\/mergeCells>/, `<mergeCells count="${merges.length}">${merges.map(r => `<mergeCell ref="${r}"/>`).join('')}</mergeCells>`)
+    .replace(/(<pageSetUpPr\b[^>]*?)\s+fitToPage="(?:1|true)"/, '$1')
+    .replace(/<pageSetup\b[^>]*?\/>/, tag => tag.replace(/\s+(?:scale|fitToWidth|fitToHeight|paperSize|orientation)="[^"]*"/g, '')
+      .replace('<pageSetup', `<pageSetup paperSize="9" scale="${scale}" orientation="portrait"`))
+    .replace(/<rowBreaks\b[\s\S]*?<\/rowBreaks>/, '');
+  if (n > 1) {
+    const brks = Array.from({ length: n - 1 }, (_, k) => `<brk id="${(k + 1) * PAGE_ROWS}" max="16383" man="1"/>`).join('');
+    const at = sheet.search(/<(colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|legacyDrawingHF|drawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b|<\/worksheet>/);
+    sheet = sheet.slice(0, at) + `<rowBreaks count="${n - 1}" manualBreakCount="${n - 1}">${brks}</rowBreaks>` + sheet.slice(at);
+  }
+  zip.file(first.sheetPath, sheet);
+  if (first.drawingPath) {
+    zip.file(first.drawingPath, first.drawing.replace(/(<xdr:wsDr\b[^>]*>)[\s\S]*(<\/xdr:wsDr>)/, (m, head, tail) => head + anchors.join('') + tail));
+  }
+
+  // Remove the other page sheets, their drawings and printer settings
+  for (const p of pages.slice(1)) {
+    wb = wb.replace(p.tag, '');
+    wbRels = wbRels.replace(p.relTag, '');
+    const parts = [p.sheetPath, p.drawingPath, ...[...p.rels.matchAll(/<Relationship\b[^>]*\/>/g)]
+      .map(m => target(m[0], path.posix.dirname(p.sheetPath))).filter(x => /printerSettings/.test(x))].filter(Boolean);
+    for (const part of parts) {
+      if (part !== first.drawingPath) zip.remove(part);
+      types = types.replace(new RegExp(`<Override PartName="/${part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*/>`), '');
+    }
+    if (p.rels) zip.remove(p.relsPath);
+  }
+  // Sheet name (Part No; Excel: max 31 characters, none of []:*?/\), one print area, first tab active
+  const name = String(sheetName || '').replace(/[[\]:*?/\\]/g, '-').trim().slice(0, 31) || 'Page';
+  wb = wb.replace(first.tag, first.tag.replace(/\bname="[^"]*"/, `name="${xmlText(name)}"`))
+    .replace(/<definedName name="_xlnm\.Print_Area"[^>]*>[^<]*<\/definedName>/g, '')
+    .replace(/<definedNames>\s*<\/definedNames>|<definedNames\/>/, '')
+    .replace(/(<workbookView\b[^>]*?)\s+(?:activeTab|firstSheet)="\d+"/g, '$1');
+  const area = `<definedName name="_xlnm.Print_Area" localSheetId="0">'${xmlText(name).replace(/'/g, "''")}'!$A$1:$${colLetter(LAST_COL)}$${last}</definedName>`;
+  wb = wb.includes('<definedNames>') ? wb.replace('<definedNames>', '<definedNames>' + area) : wb.replace('</sheets>', `</sheets><definedNames>${area}</definedNames>`);
+  zip.file('xl/workbook.xml', wb);
+  zip.file('xl/_rels/workbook.xml.rels', wbRels);
+  // docProps/app.xml lists the old sheet names; it is optional, so leave it out
+  if (zip.file('docProps/app.xml')) {
+    zip.remove('docProps/app.xml');
+    types = types.replace(/<Override PartName="\/docProps\/app\.xml"[^>]*\/>/, '');
+    zip.file('_rels/.rels', (await read('_rels/.rels')).replace(/<Relationship\b[^>]*Target="\/?docProps\/app\.xml"[^>]*\/>/, ''));
+  }
   zip.file('[Content_Types].xml', types);
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }

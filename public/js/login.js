@@ -11,6 +11,13 @@ const errorBox = document.getElementById('error');
 const btn = document.getElementById('loginBtn');
 const btnText = document.getElementById('loginText');
 
+// This page shows English • Khmer together; server messages it can get, in the same form
+const LOGIN_ERR = {
+  'Invalid request': 'Invalid request • សំណើមិនត្រឹមត្រូវ',
+  'Please enter ID and password': 'Please enter ID and password • សូមបញ្ចូលអាយឌី និងពាក្យសម្ងាត់',
+  'Cannot connect to the database': 'Cannot connect to the database • មិនអាចភ្ជាប់ទៅមូលដ្ឋានទិន្នន័យបានទេ'
+};
+
 function showError(msg) {
   errorBox.textContent = msg;
   errorBox.classList.remove('show');
@@ -25,7 +32,7 @@ form.addEventListener('submit', async (e) => {
   if (!id || !password) return showError('Please enter ID and password • សូមបញ្ចូលអាយឌី និងពាក្យសម្ងាត់');
 
   btn.disabled = true;
-  btnText.textContent = 'Signing in…';
+  btnText.textContent = 'Signing in…  •  កំពុងចូល…';
   document.body.style.cursor = 'wait';
   try {
     const res = await fetch('/api/login', {
@@ -35,10 +42,10 @@ form.addEventListener('submit', async (e) => {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) return location.replace('/menu.html');
-    showError(res.status === 401 ? 'Incorrect ID or password • អាយឌី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ' : (data.error || 'Login failed'));
+    showError(res.status === 401 ? 'Incorrect ID or password • អាយឌី ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ' : (LOGIN_ERR[data.error] || data.error || 'Login failed • ចូលប្រើមិនបាន'));
     if (res.status === 401) document.getElementById('pw').select();
   } catch {
-    showError('Cannot reach the server');
+    showError('Cannot reach the server • មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ');
   }
   document.body.style.cursor = '';
   btn.disabled = false;

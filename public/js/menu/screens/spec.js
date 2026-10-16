@@ -2,69 +2,72 @@
 // they are loaded in the order listed at the bottom of menu.html.
 
 // SPEC master: per Part No the material check text (Wire / Terminal / Housing / Other)
-// and up to 22 Length Position + SPEC rows, edited in the same layout as the OQC record
+// and its Length Position + SPEC rows, edited in the same layout as the OQC record. Like the paper file, every 22 lines
+// are one more sheet below the first (stored LineNo 1-22 on page 1, 23-44 on page 2, ...; each page shows № 1-22).
 function renderSpec(panel) {
   const canAdd = can('spec.add'), canEdit = can('spec.edit'), canDel = can('spec.delete'), canExcel = can('spec.excel');
   // [field, №, Khmer, English] for 1) MATERIAL CHECK
   const MATERIAL = [['wire', '①', 'ខ្សែ', 'Wire'], ['terminal', '②', 'ធឺរមីណល', 'Terminal'], ['housing', '③', 'ហៅស៊ីង', 'Housing'], ['other', '④', 'ផ្សេងៗ', 'Other']];
+  const PER_PAGE = 22, MAX_LINES = 200, MAX_PAGES = Math.ceil(MAX_LINES / PER_PAGE);
   let rows = [], editId = 0, mode = '';   // mode: '' (closed) | 'new' | 'edit' | 'copy' | 'view'
   // Cells that are only filled in during an inspection show as greyed blanks
   const na = (attrs = '') => `<td class="na" ${attrs}></td>`;
 
-  const lenTable = from => `<table class="oqc oqc-len">
+  // Rows № from..from+10 of page p; inputs carry the stored LineNo (p * 22 + №). Lines past 200 can't be used.
+  const lenTable = (p, from) => `<table class="oqc oqc-len">
       <thead>
         <tr><th class="c" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
           <th rowspan="2">${bi('តំលៃប្រវែងកំនត់', 'SPEC')}</th><th class="c" colspan="5">Sample</th></tr>
         <tr>${OQC_CIRC.map(c => `<th class="c">${c}</th>`).join('')}</tr>
       </thead>
-      <tbody>${Array.from({ length: 11 }, (_, k) => from + k).map(i => `<tr>
+      <tbody>${Array.from({ length: 11 }, (_, k) => from + k).map(i => {
+        const line = p * PER_PAGE + i;
+        return line > MAX_LINES ? `<tr><td class="no">${i}</td>${na()}${na()}${OQC_CIRC.map(() => na()).join('')}</tr>` : `<tr>
         <td class="no">${i}</td>
-        <td class="pos"><input data-pos="${i}" maxlength="50" aria-label="Length position ${i}"></td>
-        <td class="spc"><input data-spec="${i}" maxlength="50" aria-label="SPEC ${i}" placeholder="20±5"></td>
-        ${OQC_CIRC.map(() => na()).join('')}</tr>`).join('')}
-        <tr class="sec"><td colspan="3">${bi('លទ្ធផល', 'Result')}</td>${na('colspan="5"')}</tr>
+        <td class="pos pos-cell"><input data-pos="${line}" maxlength="100" aria-label="Length position ${line}"><span class="pos-view" aria-hidden="true"></span></td>
+        <td class="spc"><div class="spec-tol">
+          <input data-spec="${line}" maxlength="100" aria-label="SPEC ${line}" placeholder="100">
+          <span class="pm">±</span><span class="tol"><input data-plus="${line}" maxlength="20" aria-label="SPEC plus ${line}" placeholder="10"><input data-minus="${line}" maxlength="20" aria-label="SPEC minus ${line}" placeholder="5"></span>
+        </div></td>
+        ${OQC_CIRC.map(() => na()).join('')}</tr>`;
+      }).join('')}
+        <tr class="sec"><td colspan="3">${bi('លទ្ធផល', 'Result')}</td>${OQC_CIRC.map(() => na()).join('')}</tr>
       </tbody></table>`;
 
-  panel.innerHTML = `
-    <div class="readonly-note" ${canAdd || canEdit || canDel ? 'hidden' : ''}>${svg('lock')} ${T('sc.readonly')}</div>
-    <div class="msg" id="scMsg" role="status"></div>
-    <form class="oqc-sheet spec-editor" id="scForm" novalidate autocomplete="off" hidden>
-      <div class="spec-edit-bar">
-        <h3><span id="scTitle"></span><small id="scSub"></small></h3>
-        <div class="form-actions">
-          <button class="icon-btn" id="scPrint" type="button">${ico('excel')}${T('b.excel')}</button>
-          <button class="icon-btn" id="scCancel" type="button">${ico('x')}${T('b.cancel')}</button>
-          <button class="btn-primary" id="scSave" type="submit">${ico('save')}${T('b.save')}</button>
-        </div>
-      </div>
-      ${oqcHead(`<span>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}</span>`)}
+  // One sheet. Page 1 holds the Customer / Part No / material fields; later pages show copies of them (data-of)
+  const field = (p, id, html) => p ? html.replace(/\bid="([^"]+)"/, 'data-of="$1" readonly tabindex="-1"') : html;
+  const sheet = (p, total) => `
+    <section class="oqc-sheet spec-page" data-page="${p}">
+      ${oqcHead(`<span>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}</span><small class="oqc-sheet-page">Page ${p + 1} / ${total}</small>`, 'spec')}
 
       <div class="oqc-info-wrap"><table class="oqc oqc-info">
         <tr>${OQC_INFO.map(([km, en]) => `<th class="c">${bi(km, en)}</th>`).join('')}</tr>
         <tr>${OQC_INFO.map(([, en]) => en === 'CUSTOMER'
-          ? `<td><input id="scCustomer" class="big" maxlength="100" aria-label="Customer"></td>`
-          : en === 'PART №' ? `<td><input id="scPart" class="big" maxlength="100" aria-label="Part No" placeholder="FM4-H915-000"></td>` : na()).join('')}</tr>
+          ? `<td>${field(p, 'scCustomer', '<input id="scCustomer" class="big" maxlength="100" aria-label="Customer">')}</td>`
+          : en === 'PART №' ? `<td>${field(p, 'scPart', '<input id="scPart" class="big" maxlength="100" aria-label="Part No" placeholder="FM4-H915-000">')}</td>` : na()).join('')}</tr>
       </table></div>
 
       <div class="oqc-cols">
         <table class="oqc">
-          <tr><th>${bi('ប្រការត្រូវពិនិត្យ', 'INSPECTION ITEM')}</th><th class="c">${bi('លទ្ធផល', 'Result')}</th></tr>
-          <tr class="sec"><td>${bi('1) ត្រួតពិនិត្យវត្ថុធាតុដើម', 'MATERIAL CHECK')}</td>${na()}</tr>
-          ${MATERIAL.map(([k, n, km, en]) => `<tr><td colspan="2">
+          ${OQC_MAT_HEAD}
+          ${MATERIAL.map(([k, n, km, en]) => `<tr><td>
             <div class="oqc-sec-title">${n} <span class="km">${km}</span> <span class="en">[${en}]</span></div>
-            <textarea id="sc-${k}" rows="2" maxlength="1000" aria-label="${en}"></textarea></td></tr>`).join('')}
+            ${field(p, 'sc-' + k, `<textarea id="sc-${k}" rows="2" maxlength="1000" aria-label="${en}"></textarea>`)}</td>${na()}</tr>`).join('')}
         </table>
         <table class="oqc">
-          <tr><th>${bi('ប្រការត្រូវពិនិត្យ', 'INSPECTION ITEM')}</th><th class="c">${bi('លទ្ធផល', 'Result')}</th></tr>
+          ${OQC_ITEM_HEAD}
           ${OQC_ITEMS.map(([km, en]) => `<tr><td>${bi(km, en)}</td>${na()}</tr>`).join('')}
         </table>
       </div>
 
       <div>
-        <div class="oqc-sec-title"><span class="km">2) ត្រួតពិនិត្យប្រវែង</span> <span class="en">[Length Check]</span></div>
+        <div class="spec-len-head">
+          <div class="oqc-sec-title"><span class="km">2) ត្រួតពិនិត្យប្រវែង</span> <span class="en">[Length Check]</span></div>
+          ${p ? `<button class="icon-btn del spec-del-page" type="button" data-del-page="${p}">${ico('fileMinus')}${T('b.removePage')}</button>` : ''}
+        </div>
         <div class="oqc-cols">
-          <div class="oqc-len-wrap">${lenTable(1)}</div>
-          <div class="oqc-len-wrap">${lenTable(12)}</div>
+          <div class="oqc-len-wrap">${lenTable(p, 1)}</div>
+          <div class="oqc-len-wrap">${lenTable(p, 12)}</div>
         </div>
       </div>
 
@@ -77,6 +80,22 @@ function renderSpec(panel) {
         </tr>
         <tr>${na()}${na()}${na()}</tr>
       </table></div>
+    </section>`;
+
+  panel.innerHTML = `
+    <div class="readonly-note" ${canAdd || canEdit || canDel ? 'hidden' : ''}>${svg('lock')} ${T('sc.readonly')}</div>
+    <div class="msg" id="scMsg" role="status"></div>
+    <form class="spec-editor" id="scForm" novalidate autocomplete="off" hidden>
+      <div class="spec-edit-bar">
+        <h3><span id="scTitle"></span><small id="scSub"></small></h3>
+        <div class="form-actions">
+          <button class="icon-btn" id="scPrint" type="button">${ico('excel')}${T('b.excel')}</button>
+          <button class="icon-btn" id="scCancel" type="button">${ico('x')}${T('b.cancel')}</button>
+          <button class="btn-primary" id="scSave" type="submit">${ico('save')}${T('b.save')}</button>
+        </div>
+      </div>
+      <div class="spec-pages" id="scPages"></div>
+      <div class="spec-add-page"><button class="icon-btn" id="scAddPage" type="button">${ico('filePlus')}${T('b.addPage')}</button></div>
     </form>
     <div class="spec-bar">
       <label class="search">${svg('list')}<input id="scSearch" type="search" ${P('ph.scSearch')} aria-label="Search SPEC"></label>
@@ -95,7 +114,7 @@ function renderSpec(panel) {
 
   function drawList() {
     const q = $('scSearch').value.trim().toLowerCase();
-    const hit = r => !q || [r.customer, r.partNo, r.wire, r.terminal, r.housing, r.other, ...r.lengths.flatMap(l => [l.position, l.spec])]
+    const hit = r => !q || [r.customer, r.partNo, r.wire, r.terminal, r.housing, r.other, ...r.lengths.flatMap(l => [l.position, specText(l)])]
       .some(v => String(v || '').toLowerCase().includes(q));
     const list = rows.filter(hit);
     $('scCount').textContent = q ? t('sc.countOf', { n: list.length, total: rows.length }) : t('sc.count', { n: rows.length });
@@ -114,28 +133,87 @@ function renderSpec(panel) {
       </tr>`).join('') || `<tr><td colspan="9" class="empty-row">${esc(t(rows.length ? 'sc.noMatch' : 'sc.none'))}</td></tr>`;
   }
 
+  // ---- Pages: head = Customer / Part No / material (page 1 fields), lens[LineNo - 1] = { position, spec, specMinus, specPlus }
+  const pageCount = () => panel.querySelectorAll('.spec-page').length;
+  function readHead() {
+    const h = { customer: $('scCustomer') ? $('scCustomer').value : '', partNo: $('scPart') ? $('scPart').value : '' };
+    MATERIAL.forEach(([k]) => h[k] = $('sc-' + k) ? $('sc-' + k).value : '');
+    return h;
+  }
+  function readLens() {
+    const lens = [];
+    const val = (k, no) => panel.querySelector(`[data-${k}="${no}"]`).value.trim();
+    panel.querySelectorAll('[data-pos]').forEach(p => {
+      const no = Number(p.dataset.pos);
+      lens[no - 1] = { position: p.value.trim(), spec: val('spec', no), specMinus: val('minus', no), specPlus: val('plus', no) };
+    });
+    return lens;
+  }
+  // Draw n sheets, one below the other, filled with head + lens
+  function drawPages(n, head, lens) {
+    $('scPages').innerHTML = Array.from({ length: n }, (_, p) => sheet(p, n)).join('');
+    $('scCustomer').value = head.customer || '';
+    $('scPart').value = head.partNo || '';
+    MATERIAL.forEach(([k]) => $('sc-' + k).value = head[k] || '');
+    lens.forEach((l, k) => {
+      if (!l) return;
+      [['pos', 'position'], ['spec', 'spec'], ['minus', 'specMinus'], ['plus', 'specPlus']].forEach(([attr, key]) => {
+        const x = panel.querySelector(`[data-${attr}="${k + 1}"]`);
+        // Tolerances show as on the sheet, without their sign (100 ± 10 over 5); the server adds + / - back on save
+        if (x) x.value = (attr === 'minus' || attr === 'plus' ? String(l[key] || '').replace(/^[+-](?=\d)/, '') : l[key]) || '';
+      });
+    });
+    const view = mode === 'view';
+    $('scPages').querySelectorAll('input, textarea').forEach(i => i.disabled = view);
+    $('scPages').querySelectorAll('.spec-del-page').forEach(b => b.hidden = view);
+    $('scAddPage').hidden = view || n >= MAX_PAGES;
+    showPositions($('scPages'));
+    mirror();
+  }
+  // Copy the page 1 Customer / Part No / material into the later pages, and grow the material boxes to fit their text
+  function mirror() {
+    panel.querySelectorAll('[data-of]').forEach(x => { x.value = $(x.dataset.of).value; });
+    panel.querySelectorAll('.spec-page textarea').forEach(t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; });
+  }
+  $('scPages').addEventListener('input', e => { if (e.target.id) mirror(); });
+  $('scPages').addEventListener('focusout', e => { if (e.target.matches('[data-pos]')) showPositions(e.target.closest('td')); });
+  // All length lines with a Position or SPEC, numbered 1-200 across the pages
+  const lengthLines = () => readLens().map((l, k) => l && (l.position || l.spec || l.specMinus || l.specPlus) ? { no: k + 1, ...l } : null).filter(Boolean);
+
+  $('scAddPage').onclick = () => {
+    const n = pageCount();
+    if (n >= MAX_PAGES) return msg(t('sc.maxPages', { n: MAX_PAGES }));
+    drawPages(n + 1, readHead(), readLens());
+    const first = panel.querySelector(`[data-pos="${n * PER_PAGE + 1}"]`);
+    first.closest('.spec-page').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    first.focus({ preventScroll: true });
+  };
+  // Remove one page: its lines go, and the lines of the pages below move up one page
+  $('scPages').addEventListener('click', async e => {
+    const b = e.target.closest('[data-del-page]'); if (!b) return;
+    const p = Number(b.dataset.delPage);
+    if (!await uiConfirm({ tone: 'danger', icon: '🗑️', title: t('o.removeT', { n: p + 1 }),
+      message: esc(t('sc.removeM')), ok: t('b.remove'), cancel: t('b.keep') })) return;
+    const lens = readLens();
+    lens.splice(p * PER_PAGE, PER_PAGE);
+    drawPages(pageCount() - 1, readHead(), lens);
+  });
+
   // Open the editor: 'new' = blank, 'edit' = this row, 'copy' = this row's data with a blank Part No, 'view' = read-only
   function openEditor(m, r) {
     mode = m; editId = r ? r.id : 0;
-    $('scForm').reset();
-    if (r) {
-      $('scCustomer').value = r.customer || '';
-      $('scPart').value = m === 'copy' ? '' : r.partNo || '';
-      MATERIAL.forEach(([k]) => $('sc-' + k).value = r[k] || '');
-      r.lengths.forEach(l => {
-        const p = panel.querySelector(`[data-pos="${l.no}"]`), sp = panel.querySelector(`[data-spec="${l.no}"]`);
-        if (p) p.value = l.position; if (sp) sp.value = l.spec;
-      });
-    }
+    const head = r ? { ...r, partNo: m === 'copy' ? '' : r.partNo } : {};
+    const lens = [];
+    if (r) r.lengths.forEach(l => { lens[l.no - 1] = { position: l.position || '', spec: l.spec || '', specMinus: l.specMinus || '', specPlus: l.specPlus || '' }; });
+    drawPages(Math.max(1, Math.ceil(lens.length / PER_PAGE)), head, lens);
     edR = r;
     setEditorTitle();
-    $('scForm').querySelectorAll('input, textarea').forEach(i => i.disabled = m === 'view');
     $('scSave').hidden = m === 'view' || (m === 'edit' ? !canEdit : !canAdd);
     $('scPrint').hidden = !canExcel;
 
     panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
     $('scForm').hidden = false;
-    fitText();
+    mirror();
     msg('');
     drawList();
     $('scForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -149,32 +227,30 @@ function renderSpec(panel) {
     $('scSub').textContent = mode === 'copy' ? t('sc.copiedFrom', { code: edR.partNo }) : '';
     $('scCancel').innerHTML = ico('x') + T(mode === 'view' ? 'b.close' : 'b.cancel');
   }
-  function closeEditor() { mode = ''; editId = 0; $('scForm').hidden = true; drawList(); }
+  function closeEditor() { mode = ''; editId = 0; $('scForm').hidden = true; $('scPages').innerHTML = ''; drawList(); }
 
   async function load() {
     try { rows = await api('GET', '/api/spec'); drawList(); }
     catch (e) { msg(e.message); }
   }
 
-  // Grow the material boxes to fit their text, so long material lists are fully visible and printed
-  const fitText = () => MATERIAL.forEach(([k]) => { const t = $('sc-' + k); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; });
-  MATERIAL.forEach(([k]) => $('sc-' + k).addEventListener('input', fitText));
   // Values on screen (for the editor's Print button)
   function formData() {
-    const d = { customer: $('scCustomer').value.trim(), partNo: $('scPart').value.trim(), lengths: [] };
-    MATERIAL.forEach(([k]) => d[k] = $('sc-' + k).value.trim());
-    for (let i = 1; i <= 22; i++) {
-      d.lengths.push({ no: i, position: panel.querySelector(`[data-pos="${i}"]`).value.trim(), spec: panel.querySelector(`[data-spec="${i}"]`).value.trim() });
-    }
+    const h = readHead(), d = { customer: h.customer.trim(), partNo: h.partNo.trim(), lengths: lengthLines() };
+    MATERIAL.forEach(([k]) => d[k] = h[k].trim());
     return d;
   }
-  // SPEC -> Excel: one page with Customer, Part No, material text and the length Position / SPEC rows
+  // SPEC -> Excel: one page per 22 length lines, each with Customer, Part No, material text and its Position / SPEC rows (№ 1-22);
+  // the sheet has one SPEC column, so Spec / - / + are written together ("100 (+10/-5)", "30±5")
   async function specExcel(r, code) {
-    const page = { customer: r.customer || '', partNo: r.partNo || '', items: {}, total: '',
+    const lines = r.lengths || [];
+    const count = Math.max(1, Math.ceil(Math.max(0, ...lines.map(l => l.no)) / PER_PAGE));
+    const pages = Array.from({ length: count }, (_, p) => ({ customer: r.customer || '', partNo: r.partNo || '', items: {}, total: '',
       material: { wire: r.wire || '', terminal: r.terminal || '', housing: r.housing || '', other: r.other || '' },
-      lengths: (r.lengths || []).map(l => ({ no: l.no, position: l.position || '', spec: l.spec || '', samples: [] })) };
+      lengths: lines.filter(l => Math.ceil(l.no / PER_PAGE) === p + 1)
+        .map(l => ({ no: l.no - p * PER_PAGE, position: l.position || '', spec: specText(l), samples: [] })) }));
     try {
-      const file = await downloadExcel('spec', `SPEC_${code || r.partNo || 'new'}`, [page]);
+      const file = await downloadExcel('spec', `SPEC_${code || r.partNo || 'new'}`, pages);
       msg(t('o.excelDone', { file }), 'ok');
     } catch (err) { msg(err.message); }
   }
@@ -206,12 +282,7 @@ function renderSpec(panel) {
     panel.querySelectorAll('.bad').forEach(i => i.classList.remove('bad'));
     const partNo = $('scPart').value.trim();
     if (!partNo) { $('scPart').classList.add('bad'); $('scPart').focus(); return msg(t('sc.needCode')); }
-    const body = { partNo, customer: $('scCustomer').value.trim(), lengths: [] };
-    MATERIAL.forEach(([k]) => body[k] = $('sc-' + k).value.trim());
-    for (let i = 1; i <= 22; i++) {
-      const position = panel.querySelector(`[data-pos="${i}"]`).value.trim(), spec = panel.querySelector(`[data-spec="${i}"]`).value.trim();
-      if (position || spec) body.lengths.push({ no: i, position, spec });
-    }
+    const body = formData();
     $('scSave').disabled = true;
     try {
       if (mode === 'edit') await api('PUT', `/api/spec/${editId}`, body);
@@ -225,6 +296,9 @@ function renderSpec(panel) {
     } finally { $('scSave').disabled = false; }
   };
 
-  langHook = () => { drawList(); setEditorTitle(); };
+  langHook = () => {
+    drawList(); setEditorTitle();
+    if (mode) drawPages(pageCount(), readHead(), readLens());   // redraw the sheets in the new language, keeping what is typed
+  };
   load();
 }

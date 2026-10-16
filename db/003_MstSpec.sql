@@ -56,3 +56,41 @@ BEGIN
     CONSTRAINT PK_MstSpecLength PRIMARY KEY (SpecNo, [LineNo])
   );
 END
+
+-- A Part No can have more than 22 length lines: 22 per page (№ 1-22 page 1, 23-44 page 2, ...), up to 200 lines (10 pages)
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_MstSpecLength_LineNo' AND definition LIKE '%<=(22))')
+  ALTER TABLE dbo.MstSpecLength DROP CONSTRAINT CK_MstSpecLength_LineNo;
+IF OBJECT_ID('dbo.CK_MstSpecLength_LineNo', 'C') IS NULL
+  ALTER TABLE dbo.MstSpecLength ADD CONSTRAINT CK_MstSpecLength_LineNo CHECK ([LineNo] BETWEEN 1 AND 200);
+
+-- Position / Spec up to 100 characters (imported SPEC lists)
+IF COL_LENGTH('dbo.MstSpecLength', 'Position') < 200 ALTER TABLE dbo.MstSpecLength ALTER COLUMN Position nvarchar(100) NOT NULL;
+IF COL_LENGTH('dbo.MstSpecLength', 'Spec') < 200 ALTER TABLE dbo.MstSpecLength ALTER COLUMN Spec nvarchar(100) NOT NULL;
+
+-- SPEC split into the value and its tolerances: "100 (+10/-5)" -> Spec 100, SpecMinus -5, SpecPlus +10; "30±5" -> 30, -5, +5.
+-- Other forms (0.5~2mm, ≤20, Max15, (L=30), ...) stay as text in Spec with empty tolerances.
+IF COL_LENGTH('dbo.MstSpecLength', 'SpecMinus') IS NULL
+  ALTER TABLE dbo.MstSpecLength ADD SpecMinus nvarchar(20) NOT NULL CONSTRAINT DF_MstSpecLength_SpecMinus DEFAULT '';
+IF COL_LENGTH('dbo.MstSpecLength', 'SpecPlus') IS NULL
+  ALTER TABLE dbo.MstSpecLength ADD SpecPlus nvarchar(20) NOT NULL CONSTRAINT DF_MstSpecLength_SpecPlus DEFAULT '';
+GO
+-- "100 (+10/-5)"
+UPDATE dbo.MstSpecLength
+SET SpecPlus  = LTRIM(RTRIM(SUBSTRING(Spec, CHARINDEX('(', Spec) + 1, CHARINDEX('/', Spec) - CHARINDEX('(', Spec) - 1))),
+    SpecMinus = LTRIM(RTRIM(SUBSTRING(Spec, CHARINDEX('/', Spec) + 1, CHARINDEX(')', Spec) - CHARINDEX('/', Spec) - 1))),
+    Spec      = LTRIM(RTRIM(LEFT(Spec, CHARINDEX('(', Spec) - 1)))
+WHERE SpecMinus = '' AND SpecPlus = ''
+  AND Spec LIKE '[0-9]%(+[0-9]%/-[0-9]%)' AND Spec NOT LIKE '%[^0-9. (+/)-]%';
+-- "30±5"
+UPDATE dbo.MstSpecLength
+SET SpecMinus = '-' + SUBSTRING(Spec, CHARINDEX(N'±', Spec) + 1, 20),
+    SpecPlus  = '+' + SUBSTRING(Spec, CHARINDEX(N'±', Spec) + 1, 20),
+    Spec      = LEFT(Spec, CHARINDEX(N'±', Spec) - 1)
+WHERE SpecMinus = '' AND SpecPlus = ''
+  AND Spec LIKE N'[0-9]%±[0-9]%' AND Spec NOT LIKE N'%[^0-9.±]%';
+
+-- Range of each line, "min-max" (e.g. 10 -2 +2 -> "8-12", 2±1mm -> "1-3", 0.5~2mm -> "0.5-2", ≤20 -> "0-20"): the OK / NG
+-- check of the samples compares against it. Empty when the SPEC has no range to check ((30), (L=30), 5Ref, ...).
+-- The server works it out on every save; fill the existing rows once with: node tools/fill_spec_range.js --env=<env>
+IF COL_LENGTH('dbo.MstSpecLength', 'Range') IS NULL
+  ALTER TABLE dbo.MstSpecLength ADD [Range] nvarchar(30) NOT NULL CONSTRAINT DF_MstSpecLength_Range DEFAULT '';

@@ -77,6 +77,7 @@ async function saveRecord(id, r, userId) {
 // GET  /api/oqc/records?lot=..&box=.. the record of one label (for scan)
 // GET  /api/oqc/records/:id           one record with its pages
 // POST /api/oqc/records, PUT /api/oqc/records/:id   save (QC department only)
+// DELETE /api/oqc/records/:id         delete (permission daily.delete)
 async function handleOqcRecords(req, res, session, id) {
   if (!session) return sendJson(res, 401, { error: 'Not logged in' });
   try {
@@ -105,6 +106,11 @@ async function handleOqcRecords(req, res, session, id) {
              OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\'
           ORDER BY UpdateDate DESC`);
       return sendJson(res, 200, recordset);
+    }
+    if (req.method === 'DELETE' && id) {
+      const { rowsAffected } = await pool.request().input('id', sql.Int, id).query('DELETE FROM OqcRecord WHERE SysNo = @id');
+      if (!rowsAffected[0]) return sendJson(res, 404, { error: 'This record no longer exists' });
+      return sendJson(res, 200, { ok: true });
     }
     if (req.method === 'POST' && !id || req.method === 'PUT' && id) {
       let body;
@@ -137,7 +143,8 @@ async function handleOqcSpec(req, res, session) {
     if (!spec) return sendJson(res, 404, { error: `No SPEC for Part No ${partNo} — add it in Master Data › SPEC` });
     // Length Check rows of the SPEC: № on the record = LineNo
     const { recordset: lines } = await pool.request().input('id', sql.Int, spec.id).query(
-      'SELECT [LineNo] AS line, Position AS position, Spec AS spec FROM MstSpecLength WHERE SpecNo = @id ORDER BY [LineNo]');
+      `SELECT [LineNo] AS line, Position AS position, Spec AS spec, SpecMinus AS specMinus, SpecPlus AS specPlus, [Range] AS range
+       FROM MstSpecLength WHERE SpecNo = @id ORDER BY [LineNo]`);
     delete spec.id;
     sendJson(res, 200, { ...spec, lengths: lines });
   } catch (err) {
@@ -146,4 +153,31 @@ async function handleOqcSpec(req, res, session) {
   }
 }
 
-module.exports = { handleOqcRecords, handleOqcSpec };
+// Scanned label -> its receive transaction in Marunix (linked server 192.168.1.21): Lot No, Part No (item name), Qty, Box
+// GET /api/oqc/label?lot=23-0902722&item=8047&box=001   (barcode "23-0902722/8047/8/001"; box "001" is BoxNO "1")
+async function handleOqcLabel(req, res, session) {
+  if (!session) return sendJson(res, 401, { error: 'Not logged in' });
+  const q = new URL(req.url, 'http://x').searchParams;
+  const lot = String(q.get('lot') || '').trim(), item = String(q.get('item') || '').trim(), box = String(q.get('box') || '').trim();
+  if (!lot || !item || !box || lot.length > 50 || item.length > 50 || box.length > 20) return sendJson(res, 400, { error: 'Invalid request' });
+  const boxNum = /^\d+$/.test(box) ? String(Number(box)) : box;
+  try {
+    const pool = await getPool();
+    const { recordset } = await pool.request()
+      .input('lot', sql.VarChar(50), lot).input('item', sql.VarChar(50), item)
+      .input('box', sql.VarChar(20), box).input('boxNum', sql.VarChar(20), boxNum)
+      .query(`SELECT TOP 1 tbt.LotNo AS lot, tbm.ItemName AS partNo, tbt.ReceiveQty AS qty, tbt.BoxNO AS box
+        FROM [192.168.1.21].[Marunix].[dbo].[prgalltransaction] tbt
+        LEFT JOIN [192.168.1.21].[Marunix].[dbo].[mstitem] tbm ON tbt.ItemCode = tbm.ItemCode
+        WHERE tbt.GRICode = '30' AND tbt.TypeCode = 1 AND tbt.LotNo = @lot AND tbt.ItemCode = @item
+          AND tbt.BoxNO IN (@box, @boxNum)`);
+    if (!recordset[0]) return sendJson(res, 404, { error: `Label ${lot}, Item Code ${item}, Box ${box} is not in Marunix` });
+    const r = recordset[0];
+    sendJson(res, 200, { lot: String(r.lot || '').trim(), partNo: String(r.partNo || '').trim(), qty: r.qty, box: String(r.box || '').trim() });
+  } catch (err) {
+    console.error('OQC label error:', err.message);
+    sendJson(res, 500, { error: 'Database error' });
+  }
+}
+
+module.exports = { handleOqcRecords, handleOqcSpec, handleOqcLabel };
