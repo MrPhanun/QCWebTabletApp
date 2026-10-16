@@ -79,9 +79,38 @@ table.perm-grid tr.me td.sticky { background: #ecfdf5; }
 .spec-editor h3 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; }
 .spec-editor h3 small { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 .spec-edit-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+.spec-pages { display: grid; gap: 18px; margin-top: 12px; }
+.spec-len-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.spec-len-head .del:hover { border-color: #dc2626; color: #b91c1c; }
+.spec-editor [data-of] { background: none; border-color: transparent; color: var(--ink); cursor: default; }
+.spec-add-page { display: flex; justify-content: center; margin-top: 12px; }
 .spec-editor td.na { background: repeating-linear-gradient(135deg, #f6f8f7 0 6px, #eef2f0 6px 12px); }
-.spec-editor td.pos { width: 30%; }
-.spec-editor td.pos input { text-align: center; font-weight: 800; }
+.spec-editor .oqc-len td.pos { width: 23%; }
+.spec-editor .oqc-len td.spc { width: 27%; }
+.spec-editor .oqc-len td.na:not([colspan]) { width: 8%; }
+/* SPEC value with its tolerance written small beside it, + above -, e.g. 100 ⁺¹⁰₋₅ */
+.spec-editor .spec-tol { display: flex; align-items: center; gap: 2px; }
+.spec-editor .spec-tol > input { flex: 1; min-width: 34px; text-align: right; padding-left: 2px; padding-right: 2px; }
+.spec-editor .spec-tol .tol { display: grid; gap: 1px; width: 26px; flex: none; }
+.spec-editor .spec-tol .tol input { font-size: 10px; line-height: 1.1; padding: 0 2px; height: 15px; text-align: left; font-weight: 700; }
+.spec-editor .spec-tol .tol input::placeholder { font-weight: 400; }
+.spec-editor .spec-tol .pm, .oqc-len .spec-view .pm { font-weight: 700; margin: 0 1px 0 3px; }
+.spec-editor .spec-tol .pm { margin: 0; }
+/* OQC sheet: the SPEC box shows the sheet form (100 ± 10 over 5) until it is clicked to edit */
+.oqc-len td.spc { position: relative; }
+.oqc-len .spec-view { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
+  font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oqc-len .spec-view .frac { display: inline-grid; font-size: 9.5px; line-height: 1.05; text-align: left; font-weight: 700; }
+.oqc-len td.spc:not(:focus-within) input.spec { color: transparent; }
+.oqc-len td.spc:focus-within .spec-view { display: none; }
+/* Length Position like the sheet: small bold text, long names wrap onto two lines; the box shows while editing */
+.oqc-len td.pos-cell { position: relative; }
+.oqc-len .pos-view { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 7px; pointer-events: none; overflow: hidden;
+  font-size: 11px; font-weight: 800; line-height: 1.12; word-break: break-word; color: var(--ink); }
+.oqc-len .pos-view.long { font-size: 9.5px; }
+.oqc-len td.pos-cell:not(:focus-within) input[data-pos] { color: transparent; }
+.oqc-len td.pos-cell:focus-within .pos-view { display: none; }
+.spec-editor td.pos input { text-align: left; font-weight: 800; }
 .spec-editor input.big { font-size: 15px; font-weight: 800; text-align: center; }
 .spec-editor input:disabled, .spec-editor textarea:disabled { background: none; color: var(--ink); }
 table.data td.txt { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
@@ -125,13 +154,32 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .oqc-sheet select.res[data-v="OK"] { background: #d1fae5; border-color: #34d399; color: #065f46; }
 .oqc-sheet select.res[data-v="NG"] { background: #fee2e2; border-color: #f87171; color: #b91c1c; }
 .oqc-sheet select.res[data-v="/"] { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; }
+.oqc-sheet select.res:disabled { cursor: not-allowed; opacity: 1; }
+/* Material not used ("/"): one line across its text, like on the paper sheet */
+.oqc-sheet textarea.slashed {
+  color: transparent; resize: none; cursor: default;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), #475569 50%, transparent calc(50% + 1px)), #f8fafc;
+}
+.oqc-sheet textarea.slashed:focus { box-shadow: none; border-color: transparent; }
 .oqc-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
 .oqc-len-wrap { overflow-x: auto; }
-.oqc-len { min-width: 500px; }
+.oqc-len { min-width: 400px; }
 .oqc-len td { padding: 3px 4px; }
 .oqc-len td.smp { width: 58px; }
+/* Length Position like the paper sheet: small bold text, left, wide enough for "23(7-CN1PU)" */
+/* (not the Result row, where cells 2-6 are the results of ① .. ⑤) */
+.oqc-len tr:not(.sec) td:nth-child(2) { width: 23%; }
+.oqc-len tr:not(.sec) td:nth-child(3) { width: 21%; }
+.oqc-len td.smp, .oqc-len td.smp-res { width: 9%; }
+.oqc-len input[data-pos] { font-size: 11px; font-weight: 800; text-align: left; padding-left: 5px; }
+.oqc-len input.spec { font-size: 12px; padding-left: 1px; padding-right: 1px; letter-spacing: -.2px; }
+.oqc-len td.no { width: 26px; padding-left: 2px; padding-right: 2px; text-align: center; }
+.oqc-len tr:not(.sec) td:nth-child(2), .oqc-len tr:not(.sec) td:nth-child(3) { padding-left: 2px; padding-right: 2px; }
 /* ④⑤ not used: one diagonal line across the whole block (see slashUnused) */
 .oqc-len td.smp { position: relative; }
+/* Result of each sample column ① .. ⑤: small boxes under the samples */
+.oqc-len td.smp-res { padding: 3px 2px; }
+.oqc-sheet .oqc-len select.len-res { min-width: 0; height: 30px; padding: 0 2px; font-size: 12px; appearance: none; -webkit-appearance: none; text-align-last: center; }
 .oqc-len svg.slash { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
 .oqc-len svg.slash line { stroke: #475569; stroke-width: 1.6; stroke-linecap: round; }
 .oqc-len.slashed td.smp:nth-child(n+7) input { background: transparent; }

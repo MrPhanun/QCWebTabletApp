@@ -11,7 +11,7 @@ const { handlePermissions } = require('./server/routes/permissions');
 const { handleOqcExcel } = require('./server/routes/excel');
 const { handleUsers, handleUserName } = require('./server/routes/users');
 const { handleSpec } = require('./server/routes/spec');
-const { handleOqcRecords, handleOqcSpec } = require('./server/routes/oqc');
+const { handleOqcRecords, handleOqcSpec, handleOqcLabel } = require('./server/routes/oqc');
 const { handleSampling, handleSamplingLookup } = require('./server/routes/sampling');
 
 http.createServer(async (req, res) => {
@@ -43,6 +43,7 @@ http.createServer(async (req, res) => {
   const orm = urlPath.match(/^\/api\/oqc\/records(?:\/(\d+))?$/);
   if (orm) return handleOqcRecords(req, res, getSession(req), orm[1] ? Number(orm[1]) : 0);
   if (urlPath === '/api/oqc/spec') return handleOqcSpec(req, res, getSession(req));
+  if (urlPath === '/api/oqc/label') return handleOqcLabel(req, res, getSession(req));
   if (urlPath === '/api/sampling/lookup') return handleSamplingLookup(req, res, getSession(req));
   const sm = urlPath.match(/^\/api\/sampling(?:\/(\d+))?$/);
   if (sm) return handleSampling(req, res, getSession(req), sm[1] ? Number(sm[1]) : 0);

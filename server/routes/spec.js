@@ -1,9 +1,15 @@
 const { sql, getPool } = require('../db');
 const { sendJson, readJson } = require('../http');
+const { specRange } = require('../spec-range');
 
 // ---- SPEC master (MstSpec + MstSpecLength): per Part No material text and length SPEC rows ----
 const SPEC_TEXT = { customer: 100, wire: 1000, terminal: 1000, housing: 1000, other: 1000 };
-const SPEC_LINES = 22;
+const SPEC_LINES = 200;   // 22 per page (the OQC record's Length Check), up to 10 pages
+// Tolerance as stored: a number gets its sign ("5" -> "-5" / "+5"); anything else is kept as typed
+const tol = (v, sign) => {
+  const x = String(v ?? '').trim();
+  return /^[+-]?\d+(\.\d+)?$/.test(x) ? sign + x.replace(/^[+-]/, '') : x;
+};
 
 function validateSpec(b) {
   const r = { partNo: String(b.partNo || '').trim(), lengths: [] };
@@ -15,11 +21,13 @@ function validateSpec(b) {
   }
   for (const l of Array.isArray(b.lengths) ? b.lengths : []) {
     const no = Number(l.no), position = String(l.position ?? '').trim(), spec = String(l.spec ?? '').trim();
-    if (!position && !spec) continue;
+    const specMinus = tol(l.specMinus, '-'), specPlus = tol(l.specPlus, '+');
+    if (!position && !spec && !specMinus && !specPlus) continue;
     if (!Number.isInteger(no) || no < 1 || no > SPEC_LINES) return { error: `Length № must be 1-${SPEC_LINES}` };
-    if (position.length > 50 || spec.length > 50) return { error: `Length № ${no}: Position and SPEC must be 50 characters or less` };
+    if (position.length > 100 || spec.length > 100) return { error: `Length № ${no}: Position and SPEC must be 100 characters or less` };
+    if (specMinus.length > 20 || specPlus.length > 20) return { error: `Length № ${no}: SPEC - and + must be 20 characters or less` };
     if (r.lengths.some(x => x.no === no)) return { error: `Length № ${no} is given twice` };
-    r.lengths.push({ no, position, spec });
+    r.lengths.push({ no, position, spec, specMinus, specPlus, range: specRange(spec, specMinus, specPlus) });
   }
   return r;
 }
@@ -50,8 +58,10 @@ async function saveSpec(id, r, userId) {
     await new sql.Request(tx).input('id', sql.Int, out.newId).query('DELETE FROM MstSpecLength WHERE SpecNo = @id');
     for (const l of r.lengths) {
       await new sql.Request(tx).input('id', sql.Int, out.newId).input('no', sql.TinyInt, l.no)
-        .input('position', sql.NVarChar(50), l.position).input('spec', sql.NVarChar(50), l.spec)
-        .query('INSERT INTO MstSpecLength (SpecNo, [LineNo], Position, Spec) VALUES (@id, @no, @position, @spec)');
+        .input('position', sql.NVarChar(100), l.position).input('spec', sql.NVarChar(100), l.spec)
+        .input('minus', sql.NVarChar(20), l.specMinus).input('plus', sql.NVarChar(20), l.specPlus).input('range', sql.NVarChar(30), l.range)
+        .query(`INSERT INTO MstSpecLength (SpecNo, [LineNo], Position, Spec, SpecMinus, SpecPlus, [Range])
+                VALUES (@id, @no, @position, @spec, @minus, @plus, @range)`);
     }
     await tx.commit();
     return out;
@@ -71,9 +81,10 @@ async function handleSpec(req, res, session, id) {
                 UpdateBy AS updateBy, UpdateDate AS updateDate
          FROM MstSpec ORDER BY PartNo`);
       const lines = await pool.request().query(
-        'SELECT SpecNo AS specNo, [LineNo] AS no, Position AS position, Spec AS spec FROM MstSpecLength ORDER BY SpecNo, [LineNo]');
+        `SELECT SpecNo AS specNo, [LineNo] AS no, Position AS position, Spec AS spec, SpecMinus AS specMinus, SpecPlus AS specPlus,
+                [Range] AS range FROM MstSpecLength ORDER BY SpecNo, [LineNo]`);
       const byId = new Map(heads.recordset.map(h => [h.id, { ...h, lengths: [] }]));
-      for (const l of lines.recordset) byId.get(l.specNo)?.lengths.push({ no: l.no, position: l.position, spec: l.spec });
+      for (const l of lines.recordset) byId.get(l.specNo)?.lengths.push({ no: l.no, position: l.position, spec: l.spec, specMinus: l.specMinus, specPlus: l.specPlus, range: l.range });
       return sendJson(res, 200, [...byId.values()]);
     }
     if (req.method === 'POST' && !id || req.method === 'PUT' && id) {

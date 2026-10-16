@@ -5,7 +5,7 @@
 const PERM_GROUPS = [
   { k: 'm.sampling', keys: ['sampling.view', 'sampling.add', 'sampling.edit', 'sampling.delete'] },
   { k: 'm.spec', keys: ['spec.view', 'spec.add', 'spec.edit', 'spec.delete', 'spec.excel'] },
-  { k: 'm.daily', keys: ['daily.view', 'daily.add', 'daily.edit', 'daily.excel'] },
+  { k: 'm.daily', keys: ['daily.view', 'daily.add', 'daily.edit', 'daily.delete', 'daily.excel'] },
   { k: 'm.users', keys: ['users.view', 'users.add', 'users.edit', 'users.delete'] },
   { k: 'm.roles', keys: ['roles.view', 'roles.edit'] }
 ];

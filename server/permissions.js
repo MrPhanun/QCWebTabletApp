@@ -7,7 +7,7 @@ const isQC = dept => String(dept || '').trim().toUpperCase() === 'QC';
 const PERMS = [
   'sampling.view', 'sampling.add', 'sampling.edit', 'sampling.delete',
   'spec.view', 'spec.add', 'spec.edit', 'spec.delete', 'spec.excel',
-  'daily.view', 'daily.add', 'daily.edit', 'daily.excel',
+  'daily.view', 'daily.add', 'daily.edit', 'daily.delete', 'daily.excel',
   'users.view', 'users.add', 'users.edit', 'users.delete',
   'roles.view', 'roles.edit'
 ];
@@ -15,7 +15,7 @@ const PERMS = [
 // Admin role manages users and permissions (same as before permissions existed)
 function defaultPerms(role, dept) {
   const p = ['sampling.view', 'spec.view', 'spec.excel', 'daily.view', 'daily.excel'];
-  if (isQC(dept)) p.push('sampling.add', 'sampling.edit', 'sampling.delete', 'spec.add', 'spec.edit', 'spec.delete', 'daily.add', 'daily.edit');
+  if (isQC(dept)) p.push('sampling.add', 'sampling.edit', 'sampling.delete', 'spec.add', 'spec.edit', 'spec.delete', 'daily.add', 'daily.edit', 'daily.delete');
   if (role === 'Admin') p.push('users.view', 'users.add', 'users.edit', 'users.delete', 'roles.view', 'roles.edit');
   return p;
 }
@@ -32,8 +32,8 @@ function permFor(urlPath, method) {
   if (urlPath === '/api/sampling/lookup') return ['daily.view', 'sampling.view'];
   if (/^\/api\/sampling(\/\d+)?$/.test(urlPath)) return by({ GET: 'sampling.view', POST: 'sampling.add', PUT: 'sampling.edit', DELETE: 'sampling.delete' });
   if (/^\/api\/spec(\/\d+)?$/.test(urlPath)) return by({ GET: 'spec.view', POST: 'spec.add', PUT: 'spec.edit', DELETE: 'spec.delete' });
-  if (/^\/api\/oqc\/records(\/\d+)?$/.test(urlPath)) return by({ GET: 'daily.view', POST: 'daily.add', PUT: 'daily.edit' });
-  if (urlPath === '/api/oqc/spec' || urlPath === '/api/user/name') return 'daily.view';
+  if (/^\/api\/oqc\/records(\/\d+)?$/.test(urlPath)) return by({ GET: 'daily.view', POST: 'daily.add', PUT: 'daily.edit', DELETE: 'daily.delete' });
+  if (urlPath === '/api/oqc/spec' || urlPath === '/api/oqc/label' || urlPath === '/api/user/name') return 'daily.view';
   if (urlPath === '/api/excel/oqc') return 'daily.excel';
   if (urlPath === '/api/excel/spec') return 'spec.excel';
   if (/^\/api\/users(\/[^/]+)?$/.test(urlPath)) return by({ GET: 'users.view', POST: 'users.add', PUT: 'users.edit', DELETE: 'users.delete' });
