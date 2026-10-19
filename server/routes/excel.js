@@ -7,21 +7,15 @@ const path = require('path');
 
 // Printer the PDF button sends to (override with "pdfPrinter" in config/<env>.json)
 const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
-// Folder the PDF and Excel files are saved in: the "Report - ..." folder in the project root; override with "pdfFolder" in config/<env>.json
-const ROOT = path.join(__dirname, '..', '..');
-const reportFolder = () => {
-  const found = fs.readdirSync(ROOT, { withFileTypes: true }).find(d => d.isDirectory() && d.name.startsWith('Report - '));
-  return found ? path.join(ROOT, found.name) : path.join(require('os').homedir(), 'Desktop', 'Report');
+// Files are saved on the PC the server runs on: <Desktop>\Report\OQC (Excel and PDF) and <Desktop>\Report\SPEC, created when missing.
+// Override the Report folder with "pdfFolder" in config/<env>.json
+const desktop = () => {
+  const home = require('os').homedir();
+  return [path.join(home, 'Desktop'), path.join(home, 'OneDrive', 'Desktop')].find(d => fs.existsSync(d)) || path.join(home, 'Desktop');
 };
-const REPORT_FOLDER = config.pdfFolder || reportFolder();
-// OQC files (Excel and PDF) go in the OQC subfolder, SPEC files in SPEC (existing folders are reused, else created)
-const subFolder = (prefix, fallback) => {
-  let found = null;
-  try { found = fs.readdirSync(REPORT_FOLDER, { withFileTypes: true }).find(d => d.isDirectory() && d.name.startsWith(prefix)); } catch {}
-  return path.join(REPORT_FOLDER, found ? found.name : fallback);
-};
-const OQC_FOLDER = () => subFolder('ទិន្នន័យ OQC', 'OQC');
-const SPEC_FOLDER = () => subFolder('SPEC', 'SPEC');
+const REPORT_FOLDER = config.pdfFolder || path.join(desktop(), 'Report');
+const OQC_FOLDER = () => path.join(REPORT_FOLDER, 'OQC');
+const SPEC_FOLDER = () => path.join(REPORT_FOLDER, 'SPEC');
 // File name: OQC_<dd-mm-yyyy>.pdf (today)
 const pdfBase = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `OQC_${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`; };
 
