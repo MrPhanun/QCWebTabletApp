@@ -130,7 +130,7 @@ function specSplitStyles(ctx) {
   const nB = +ctx.styles.match(/<borders count="(\d+)"/)[1], nF = +ctx.styles.match(/<fonts count="(\d+)"/)[1];
   ctx.styles = ctx.styles
     .replace(/<borders count="\d+">([\s\S]*?)<\/borders>/, (m, b) => `<borders count="${nB + 2}">${b}${edge(0, 'R')}${edge(0, 'L')}</borders>`)
-    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 1}"${a}>${b}<font><b/><sz val="9"/><name val="Cambria"/><family val="1"/></font></fonts>`);
+    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 1}"${a}>${b}<font><sz val="7"/><name val="Cambria"/><family val="1"/></font></fonts>`);
   const left = addXf(ctx, `<xf numFmtId="0" fontId="22" fillId="0" borderId="${nB}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`);
   const right = addXf(ctx, `<xf numFmtId="0" fontId="${nF}" fillId="0" borderId="${nB + 1}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`);
   return (ctx.cache.spec = { left, right });
