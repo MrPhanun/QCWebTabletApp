@@ -72,8 +72,33 @@ async function api(method, url, body) {
 // POST the record to /api/excel/<kind> and save the .xlsx the server returns.
 // kind: 'oqc' -> "OQC Data.xlsx", 'spec' -> "Spec.xlsx"
 async function downloadExcel(kind, fileName, pages) { return downloadFile(`/api/excel/${kind}`, fileName, '.xlsx', pages); }
-// PDF of an OQC record: the server fills "OQC Data.xlsx", prints it to the "Microsoft Print to PDF" printer and returns the PDF
+// Excel of an OQC record or SPEC, and the PDF of an OQC record (the server prints it with Microsoft Print to PDF):
+// the file comes back to this computer and is saved in Report\OQC or Report\SPEC (see saveReport)
+async function openExcel(fileName, pages, kind = 'oqc') { return downloadFile(`/api/excel/${kind}`, fileName, '.xlsx', pages); }
 async function printPdf(fileName, pages) { return downloadFile('/api/pdf/oqc', fileName, '.pdf', pages); }
+
+// Saves a file in <chosen folder>\Report\<sub> on THIS computer, creating the folders. Needs Chrome/Edge on https or localhost
+// (File System Access API): the folder (e.g. Desktop) is chosen once and remembered. Otherwise it is a normal browser download.
+const reportDb = () => new Promise((ok, no) => { const q = indexedDB.open('qc-report', 1); q.onupgradeneeded = () => q.result.createObjectStore('h'); q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error); });
+const reportGet = async () => { const db = await reportDb(); return new Promise(ok => { const q = db.transaction('h').objectStore('h').get('root'); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); }); };
+const reportSet = async h => { const db = await reportDb(); return new Promise(ok => { const q = db.transaction('h', 'readwrite').objectStore('h').put(h, 'root'); q.onsuccess = q.onerror = () => ok(); }); };
+async function saveReport(sub, name, blob) {
+  if (!window.showDirectoryPicker || !window.isSecureContext) return false;
+  try {
+    let root = await reportGet().catch(() => null);
+    if (!root || await root.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+      root = await window.showDirectoryPicker({ id: 'qc-report', mode: 'readwrite', startIn: 'desktop' });
+      await reportSet(root).catch(() => {});
+    }
+    const dir = await (await root.getDirectoryHandle('Report', { create: true })).getDirectoryHandle(sub, { create: true });
+    const dot = name.lastIndexOf('.'), base = name.slice(0, dot), ext = name.slice(dot);
+    let file = name, n = 1;
+    for (;;) { try { await dir.getFileHandle(file); file = `${base} (${++n})${ext}`; } catch { break; } }
+    const w = await (await dir.getFileHandle(file, { create: true })).createWritable();
+    await w.write(blob); await w.close();
+    return [root.name, 'Report', sub, file].join(' / ');
+  } catch { return false; }   // cancelled or not allowed: fall back to the normal download
+}
 async function downloadFile(url, fileName, ext, pages) {
   setBusy(true);
   try {
@@ -86,6 +111,8 @@ async function downloadFile(url, fileName, ext, pages) {
     }
     const blob = await res.blob();
     const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || `${fileName}${ext}`;
+    const saved = await saveReport(url.includes('/spec') ? 'SPEC' : 'OQC', name, blob);
+    if (saved) return saved;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;

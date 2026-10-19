@@ -47,7 +47,7 @@ async function handleOqcExcel(req, res, session, kind) {
 }
 
 // PDF: POST /api/pdf/oqc, same body as the Excel download. The filled "OQC Data.xlsx" is made, printed to the
-// "Microsoft Print to PDF" printer of the PC the server runs on (into a temporary folder), and the PDF is sent back as a download.
+// "Microsoft Print to PDF" printer of the PC the server runs on (into a temporary folder), and the PDF is sent back to the browser.
 async function handleOqcPdf(req, res, session) {
   const r = await readExportRequest(req, res, session, '.pdf');
   if (!r) return;
