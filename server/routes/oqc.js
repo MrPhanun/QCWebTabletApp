@@ -3,7 +3,7 @@ const { sendJson, readJson } = require('../http');
 
 // ---- Saved OQC records (OqcRecord): one per label (LotNo + BoxNo), all pages in Data as JSON ----
 const REC_COLS = `SysNo AS id, LotNo AS lot, BoxNo AS box, ItemCode AS itemCode, PartNo AS partNo, Customer AS customer,
-  CONVERT(varchar(10), CheckDate, 23) AS checkDate, Qty AS qty, Probability AS probability, Total AS total,
+  CONVERT(varchar(10), CheckDate, 23) AS checkDate, CONVERT(varchar(10), ShipmentDate, 23) AS shipDate, Qty AS qty, Probability AS probability, Total AS total,
   Inspector AS inspector, CheckedBy AS checkedBy, PageCount AS pageCount, Complete AS complete,
   RegBy AS regBy, RegDate AS regDate, UpdateBy AS updateBy, UpdateDate AS updateDate`;
 
@@ -24,6 +24,9 @@ function validateRecord(b) {
     if (!r.lot) return { error: 'Lot № is required to save — scan the label or type the Lot №' };
     if (!['', 'OK', 'NG'].includes(r.total)) return { error: 'Total must be OK or NG' };
     r.checkDate = /^\d{4}-\d{2}-\d{2}$/.test(String(b.checkDate || '')) ? b.checkDate : null;
+    // Shipment Date is a condition for saving
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.shipDate || '')) || isNaN(Date.parse(b.shipDate))) return { error: 'Pick the Shipment Date to save' };
+    r.shipDate = b.shipDate;
     const qty = Number(b.qty);
     r.qty = String(b.qty ?? '').trim() !== '' && Number.isInteger(qty) && qty >= 0 && qty <= MAX_INT ? qty : null;
     if (!Array.isArray(b.pages) || !b.pages.length || b.pages.length > 50) return { error: 'A record needs 1 to 50 pages' };
@@ -40,7 +43,7 @@ async function saveRecord(id, r, userId) {
   const result = await pool.request()
     .input('id', sql.Int, id).input('lot', sql.VarChar(50), r.lot).input('box', sql.VarChar(20), r.box)
     .input('itemCode', sql.VarChar(50), r.itemCode).input('partNo', sql.NVarChar(100), r.partNo)
-    .input('customer', sql.NVarChar(200), r.customer).input('checkDate', sql.Date, r.checkDate)
+    .input('customer', sql.NVarChar(200), r.customer).input('checkDate', sql.Date, r.checkDate).input('shipDate', sql.Date, r.shipDate)
     .input('qty', sql.Int, r.qty).input('probability', sql.VarChar(10), r.probability).input('total', sql.VarChar(2), r.total)
     .input('inspector', sql.NVarChar(80), r.inspector).input('checkedBy', sql.NVarChar(80), r.checkedBy)
     .input('pageCount', sql.TinyInt, r.pageCount).input('complete', sql.Bit, r.complete)
@@ -53,15 +56,15 @@ async function saveRecord(id, r, userId) {
       BEGIN
         IF @id = 0
         BEGIN
-          INSERT INTO OqcRecord (LotNo, BoxNo, ItemCode, PartNo, Customer, CheckDate, Qty, Probability, Total, Inspector, CheckedBy,
+          INSERT INTO OqcRecord (LotNo, BoxNo, ItemCode, PartNo, Customer, CheckDate, ShipmentDate, Qty, Probability, Total, Inspector, CheckedBy,
                                  PageCount, Complete, Data, RegBy, UpdateBy)
-          VALUES (@lot, @box, @itemCode, @partNo, @customer, @checkDate, @qty, @probability, @total, @inspector, @checkedBy,
+          VALUES (@lot, @box, @itemCode, @partNo, @customer, @checkDate, @shipDate, @qty, @probability, @total, @inspector, @checkedBy,
                   @pageCount, @complete, @data, @user, @user);
           SET @rc = @@ROWCOUNT; SET @newId = SCOPE_IDENTITY();
         END
         ELSE
         BEGIN
-          UPDATE OqcRecord SET LotNo=@lot, BoxNo=@box, ItemCode=@itemCode, PartNo=@partNo, Customer=@customer, CheckDate=@checkDate,
+          UPDATE OqcRecord SET LotNo=@lot, BoxNo=@box, ItemCode=@itemCode, PartNo=@partNo, Customer=@customer, CheckDate=@checkDate, ShipmentDate=@shipDate,
             Qty=@qty, Probability=@probability, Total=@total, Inspector=@inspector, CheckedBy=@checkedBy, PageCount=@pageCount,
             Complete=@complete, Data=@data, UpdateBy=@user, UpdateDate=GETDATE()
           WHERE SysNo = @id;
@@ -73,7 +76,7 @@ async function saveRecord(id, r, userId) {
   return result.recordset[0];
 }
 
-// GET  /api/oqc/records?q=text        search (newest first, max 200)
+// GET  /api/oqc/records?q=text&from=YYYY-MM-DD&to=YYYY-MM-DD   search (newest first, max 200); from / to = Shipment Date range
 // GET  /api/oqc/records?lot=..&box=.. the record of one label (for scan)
 // GET  /api/oqc/records/:id           one record with its pages
 // POST /api/oqc/records, PUT /api/oqc/records/:id   save (QC department only)
@@ -100,10 +103,13 @@ async function handleOqcRecords(req, res, session, id) {
       }
       const text = String(q.get('q') || '').trim().slice(0, 100);
       const like = '%' + text.replace(/[\\%_[]/g, c => '\\' + c) + '%';
+      const day = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !isNaN(Date.parse(v)) ? v : null;
       const { recordset } = await pool.request().input('text', sql.NVarChar(100), text).input('like', sql.NVarChar(210), like)
+        .input('from', sql.Date, day(q.get('from'))).input('to', sql.Date, day(q.get('to')))
         .query(`SELECT TOP 200 ${REC_COLS} FROM OqcRecord
-          WHERE @text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
-             OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\'
+          WHERE (@text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
+             OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\')
+            AND (@from IS NULL OR ShipmentDate >= @from) AND (@to IS NULL OR ShipmentDate <= @to)
           ORDER BY UpdateDate DESC`);
       return sendJson(res, 200, recordset);
     }
@@ -144,7 +150,7 @@ async function handleOqcSpec(req, res, session) {
     // Length Check rows of the SPEC: № on the record = LineNo
     const { recordset: lines } = await pool.request().input('id', sql.Int, spec.id).query(
       `SELECT [LineNo] AS line, Position AS position, Spec AS spec, SpecMinus AS specMinus, SpecPlus AS specPlus, [Range] AS range
-       FROM MstSpecLength WHERE SpecNo = @id ORDER BY [LineNo]`);
+       FROM MstSpecLength WHERE SpecNo = @id AND LTRIM(RTRIM(ISNULL(Position, ''))) <> '' ORDER BY [LineNo]`);
     delete spec.id;
     sendJson(res, 200, { ...spec, lengths: lines });
   } catch (err) {

@@ -47,7 +47,7 @@ const STR = {
   'loading': ['Loading…', 'កំពុងផ្ទុក…'], 'notBuilt': ['This screen is not built yet.', 'អេក្រង់នេះមិនទាន់បានបង្កើតនៅឡើយទេ។'],
   'm.dashboard': ['Dashboard', 'ផ្ទាំងគ្រប់គ្រង'], 'm.master': ['Master Data', 'ទិន្នន័យមេ'], 'm.sampling': ['OQC Inspection', 'ការត្រួតពិនិត្យ OQC'],
   'm.spec': ['តំលៃប្រវែងកំនត់ / SPEC', 'តំលៃប្រវែងកំនត់ / SPEC'], 'm.reports': ['Reports', 'របាយការណ៍'],
-  'm.daily': ['OQC Data Information', 'ព័ត៌មានទិន្នន័យ OQC'], 'm.defect': ['Defect Analysis', 'ការវិភាគចំណុចខូច'],
+  'm.daily': ['OQC Data Information', 'ព័ត៌មានទិន្នន័យ OQC'], 'm.draft': ['Search Draft / Save', 'ស្វែងរកតារាងព្រៀង និង រក្សាទុក'], 'm.defect': ['Defect Analysis', 'ការវិភាគចំណុចខូច'],
   'm.supplier': ['Supplier Quality', 'គុណភាពអ្នកផ្គត់ផ្គង់'], 'm.admin': ['Administration', 'រដ្ឋបាលប្រព័ន្ធ'],
   'm.users': ['User Management', 'គ្រប់គ្រងអ្នកប្រើប្រាស់'], 'm.roles': ['Roles & Permissions', 'តួនាទី និងសិទ្ធិ'],
   'e.server': ['Cannot reach the server', 'មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ'], 'e.session': ['Session expired', 'វគ្គប្រើប្រាស់បានផុតកំណត់'],
@@ -118,6 +118,18 @@ const STR = {
   'o.removeM': ['Everything on this page will be removed. The other pages stay.', 'អ្វីៗទាំងអស់នៅលើទំព័រនេះនឹងត្រូវលុប។ ទំព័រផ្សេងទៀតនៅដដែល។'],
   'o.pageRemoved': ['Page removed — {n} page{s} left', 'បានលុបទំព័រ — នៅសល់ {n} ទំព័រ'],
   'o.lenPos': ['Length № {no}: Length Position', 'ប្រវែង № {no}៖ ទីតាំងប្រវែង'], 'o.lenSample': ['Length № {no}: sample {list}', 'ប្រវែង № {no}៖ គំរូ {list}'],
+  'o.badLot': ['Lot № must be a date: DD-MM-YYYY.', 'Lot № ត្រូវតែជាកាលបរិច្ឆេទ៖ ថ្ងៃ-ខែ-ឆ្នាំ។'], 'ph.lotDate': ['DD-MM-YYYY', 'ថ្ងៃ-ខែ-ឆ្នាំ'], 'ph.dateFmt': ['DD-MM-YYYY', 'ថ្ងៃ-ខែ-ឆ្នាំ'], 't.pickDate': ['Pick a date', 'ជ្រើសរើសកាលបរិច្ឆេទ'],
+  'o.shipDate': ['Shipment Date', 'ថ្ងៃដឹកជញ្ជូន'], 'o.needShip': ['Pick the Shipment Date to save.', 'សូមជ្រើសរើសថ្ងៃដឹកជញ្ជូន ដើម្បីរក្សាទុក។'],
+  'o.shipFrom': ['Shipment from', 'ថ្ងៃដឹកជញ្ជូនពី'], 'o.shipTo': ['to', 'ដល់'], 'h.shipDate': ['Shipment Date', 'ថ្ងៃដឹកជញ្ជូន'], 'b.pdf': ['PDF', 'PDF'],
+  'dr.pick': ['Click a row first, then press Excel or PDF.', 'សូមចុចជួរមួយជាមុនសិន រួចចុច Excel ឬ PDF។'],
+  'dr.notReadyM': ['This record is a draft, so some points are still empty. Excel and PDF need every point filled in. Open it to complete?', 'កំណត់ត្រានេះជាសេចក្តីព្រាង នៅមានចំណុចទទេ។ Excel និង PDF ត្រូវការបំពេញគ្រប់ចំណុច។ បើកដើម្បីបំពេញឬទេ?'],
+  'dr.cantPrintT': ["Can't print yet", 'មិនទាន់អាចបោះពុម្ពបានទេ'],
+  'dr.cantPrint': ['{label} is still a draft. Excel and PDF need every point filled in: open it, complete the empty fields and Save.', '{label} នៅជាសេចក្តីព្រាង។ Excel និង PDF ត្រូវការបំពេញគ្រប់ចំណុច៖ សូមបើក បំពេញចំណុចទទេ រួចចុច រក្សាទុក។'],
+  'o.fileOpened': ['Saved {file} in {folder} and opened it.', 'បានរក្សាទុក {file} ក្នុង {folder} ហើយបើកវា។'],
+  'o.pdfSent': ['Saved the PDF {file} in {folder}', 'បានរក្សាទុក PDF {file} ក្នុង {folder}'],
+  'dr.openFix': ['Open to complete', 'បើកដើម្បីបំពេញ'],
+  'dr.draftT': ['This record is a draft', 'កំណត់ត្រានេះជាសេចក្តីព្រាង'],
+  'dr.draftM': ['Some fields are not complete yet. Continue anyway?', 'ព័ត៌មានខ្លះមិនទាន់គ្រប់គ្រាន់ទេ។ បន្តដែរឬទេ?'],
   'o.notReadyT': ['Not ready to print yet', 'មិនទាន់រួចរាល់សម្រាប់បោះពុម្ពទេ'],
   'o.notReadyM': ['Fill in every point first — the empty fields are outlined in red.', 'សូមបំពេញគ្រប់ចំណុចជាមុនសិន — ចំណុចដែលនៅទទេត្រូវបានគូសពណ៌ក្រហម។'],
   'o.pageN': ['Page {n}', 'ទំព័រ {n}'], 'o.more': ['and {n} more', 'និង {n} ទៀត'],
@@ -147,6 +159,7 @@ const TT = key => `title="${esc(t(key))}" aria-label="${esc(t(key))}" data-tt="$
 function applyLang(root = document) {
   root.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t, el.dataset.tv ? JSON.parse(el.dataset.tv) : null); });
   root.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.dataset.tp); });
+  root.querySelectorAll('.date-wrap').forEach(w => w._sync && w._sync());
   root.querySelectorAll('[data-tt]').forEach(el => { el.title = t(el.dataset.tt); el.setAttribute('aria-label', t(el.dataset.tt)); });
   document.documentElement.lang = LANG;
   document.querySelectorAll('.lang-switch button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));

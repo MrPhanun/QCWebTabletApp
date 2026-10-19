@@ -26,8 +26,8 @@ function renderSpec(panel) {
         <td class="no">${i}</td>
         <td class="pos pos-cell"><input data-pos="${line}" maxlength="100" aria-label="Length position ${line}"><span class="pos-view" aria-hidden="true"></span></td>
         <td class="spc"><div class="spec-tol">
-          <input data-spec="${line}" maxlength="100" aria-label="SPEC ${line}" placeholder="100">
-          <span class="pm">±</span><span class="tol"><input data-plus="${line}" maxlength="20" aria-label="SPEC plus ${line}" placeholder="10"><input data-minus="${line}" maxlength="20" aria-label="SPEC minus ${line}" placeholder="5"></span>
+          <input data-spec="${line}" maxlength="100" aria-label="SPEC ${line}" placeholder=" ">
+          <span class="pm">±</span><span class="tol"><input data-plus="${line}" maxlength="20" aria-label="SPEC plus ${line}" placeholder=" "><input data-minus="${line}" maxlength="20" aria-label="SPEC minus ${line}" placeholder=" "></span>
         </div></td>
         ${OQC_CIRC.map(() => na()).join('')}</tr>`;
       }).join('')}

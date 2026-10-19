@@ -71,10 +71,15 @@ async function api(method, url, body) {
 }
 // POST the record to /api/excel/<kind> and save the .xlsx the server returns.
 // kind: 'oqc' -> "OQC Data.xlsx", 'spec' -> "Spec.xlsx"
-async function downloadExcel(kind, fileName, pages) {
+async function downloadExcel(kind, fileName, pages) { return downloadFile(`/api/excel/${kind}`, fileName, '.xlsx', pages); }
+// Excel of an OQC record, saved in the server PC's Downloads folder and opened in Excel
+async function openExcel(fileName, pages) { return api('POST', '/api/excel/oqc?open=1', { fileName, itemList: OQC_ITEMS.map(i => [i[0], i[1]]), pages }); }
+// PDF of an OQC record: the server fills "OQC Data.xlsx" and prints it straight to the "Microsoft Print to PDF" printer
+async function printPdf(fileName, pages) { return api('POST', '/api/pdf/oqc', { fileName, itemList: OQC_ITEMS.map(i => [i[0], i[1]]), pages }); }
+async function downloadFile(url, fileName, ext, pages) {
   setBusy(true);
   try {
-    const res = await fetch(`/api/excel/${kind}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName, itemList: OQC_ITEMS.map(i => [i[0], i[1]]), pages }) });
     if (res.status === 401) { location.replace('/'); throw new Error(t('e.session')); }
     if (!res.ok) {
@@ -82,7 +87,7 @@ async function downloadExcel(kind, fileName, pages) {
       throw new Error(data.error ? trServer(data.error) : t('e.request', { status: res.status }));
     }
     const blob = await res.blob();
-    const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || `${fileName}.xlsx`;
+    const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || `${fileName}${ext}`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -96,3 +101,32 @@ async function downloadExcel(kind, fileName, pages) {
   } finally { setBusy(false); }
 }
 const fmtDate = d => d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+// Date fields: the browser's date picker shows its own format, so each <input type="date"> keeps working as it is
+// (value = yyyy-mm-dd, native calendar) while its text is hidden and a DD-MM-YYYY label is shown over it.
+// Empty: DD-MM-YYYY (English) / ថ្ងៃ-ខែ-ឆ្នាំ (Khmer). The label also follows values set from code.
+function enhanceDate(inp) {
+  if (inp._dateView) return;
+  let wrap = inp.parentNode;
+  if (!wrap.classList.contains('date-wrap')) {
+    wrap = document.createElement('span'); wrap.className = 'date-wrap';
+    inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+  }
+  let view = wrap.querySelector('.date-view');
+  if (!view) { view = document.createElement('span'); view.className = 'date-view'; view.setAttribute('aria-hidden', 'true'); wrap.appendChild(view); }
+  inp._dateView = view;
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const sync = () => {
+    const v = desc.get.call(inp), m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    view.textContent = m ? `${m[3]}-${m[2]}-${m[1]}` : t('ph.dateFmt');
+    view.classList.toggle('empty', !m);
+    const cs = getComputedStyle(inp);
+    view.style.font = cs.font; view.style.paddingLeft = cs.paddingLeft;
+  };
+  Object.defineProperty(inp, 'value', { get() { return desc.get.call(inp); }, set(v) { desc.set.call(inp, v); sync(); }, configurable: true });
+  inp.addEventListener('input', sync); inp.addEventListener('change', sync);
+  wrap._sync = sync;
+  sync();
+}
+function enhanceDates(root = document) { root.querySelectorAll('input[type="date"]:not(#oqcLotPick)').forEach(enhanceDate); }
+
