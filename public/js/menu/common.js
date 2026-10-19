@@ -72,10 +72,8 @@ async function api(method, url, body) {
 // POST the record to /api/excel/<kind> and save the .xlsx the server returns.
 // kind: 'oqc' -> "OQC Data.xlsx", 'spec' -> "Spec.xlsx"
 async function downloadExcel(kind, fileName, pages) { return downloadFile(`/api/excel/${kind}`, fileName, '.xlsx', pages); }
-// Excel of an OQC record, saved in the server PC's the Report folder folder and opened in Excel
-async function openExcel(fileName, pages, kind = 'oqc') { return api('POST', `/api/excel/${kind}?open=1`, { fileName, itemList: OQC_ITEMS.map(i => [i[0], i[1]]), pages }); }
-// PDF of an OQC record: the server fills "OQC Data.xlsx" and prints it straight to the "Microsoft Print to PDF" printer
-async function printPdf(fileName, pages) { return api('POST', '/api/pdf/oqc', { fileName, itemList: OQC_ITEMS.map(i => [i[0], i[1]]), pages }); }
+// PDF of an OQC record: the server fills "OQC Data.xlsx", prints it to the "Microsoft Print to PDF" printer and returns the PDF
+async function printPdf(fileName, pages) { return downloadFile('/api/pdf/oqc', fileName, '.pdf', pages); }
 async function downloadFile(url, fileName, ext, pages) {
   setBusy(true);
   try {

@@ -76,23 +76,23 @@ function renderDraft(panel) {
     const id = Number(btn.dataset.open || btn.dataset.excel || btn.dataset.pdf || btn.dataset.del);
     const r = list.find(x => x.id === id); if (!r) return;
     if (btn.dataset.open) return gotoOQC(id, false, !r.complete);
-    // PDF: the filled "OQC Data.xlsx" is printed to a PDF file in the Report folder (Microsoft Print to PDF) and opened
+    // PDF: the filled "OQC Data.xlsx" is printed to a PDF (Microsoft Print to PDF) and downloaded
     if (btn.dataset.pdf) {
       try {
         if (!await needComplete(r)) return;
         const full = await api('GET', `/api/oqc/records/${id}`);
-        const out = await printPdf(`OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
-        msg(t('o.fileOpened', { file: out.file, folder: out.folder }), 'ok');
+        const file = await printPdf(`OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
+        msg(t('o.excelDone', { file }), 'ok');
       } catch (err) { msg(err.message); }
       return;
     }
-    // Excel: the saved pages go into "OQC Data.xlsx", saved in the Report folder and opened
+    // Excel: the saved pages go into "OQC Data.xlsx", downloaded
     if (btn.dataset.excel) {
       try {
         if (!await needComplete(r)) return;
         const full = await api('GET', `/api/oqc/records/${id}`);
-        const out = await openExcel(`OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
-        msg(t('o.fileOpened', { file: out.file, folder: out.folder }), 'ok');
+        const file = await downloadExcel('oqc', `OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
+        msg(t('o.excelDone', { file }), 'ok');
       } catch (err) { msg(err.message); }
       return;
     }
