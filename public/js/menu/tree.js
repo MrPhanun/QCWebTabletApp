@@ -9,7 +9,8 @@ const MENU = [
     { id: 'spec', k: 'm.spec', icon: 'ruler', perm: 'spec.view' }
   ]},
   { id: 'reports', k: 'm.reports', icon: 'chart', children: [
-    { id: 'daily', k: 'm.daily', icon: 'calendar', perm: 'daily.view' }
+    { id: 'daily', k: 'm.daily', icon: 'calendar', perm: 'daily.view' },
+    { id: 'draft', k: 'm.draft', icon: 'search', perm: 'daily.view' }
   ]},
   { id: 'admin', k: 'm.admin', icon: 'shield', children: [
     { id: 'users', k: 'm.users', icon: 'users', perm: 'users.view' },

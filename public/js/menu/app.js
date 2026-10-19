@@ -2,7 +2,7 @@
 // they are loaded in the order listed at the bottom of menu.html.
 
 // ---- Screens: menu ids that have a real screen instead of the placeholder ----
-const SCREENS = { sampling: renderSampling, spec: renderSpec, daily: renderOQC, users: renderUsers, roles: renderRoles };
+const SCREENS = { sampling: renderSampling, spec: renderSpec, daily: renderOQC, draft: renderDraft, users: renderUsers, roles: renderRoles };
 
 // Language switch: update text in place (forms keep what was typed), then let lists/counters redraw
 function setLang(l) {

@@ -234,3 +234,32 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .spt td.v-text { font-size: 10pt; text-align: left; vertical-align: top; padding: 2px 6px; white-space: pre-wrap; word-break: break-word; }
 .spt td.v-pos { font-size: 12pt; font-weight: 700; text-align: center; vertical-align: middle; white-space: normal; }
 .spt td.v-spec { font-size: 11pt; text-align: center; vertical-align: middle; white-space: normal; }
+
+/* Shipment Date (OQC toolbar) and the Search Draft / Save filters */
+.oqc-ship { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.oqc-ship input { height: 38px; padding: 0 10px; border: 1.5px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.8);
+  font-weight: 600; font-size: 13px; font-family: inherit; color: var(--ink); outline: 0; }
+.oqc-ship input:focus { border-color: var(--accent-1); box-shadow: 0 0 0 4px rgba(5,150,105,.15); }
+.oqc-ship input.missing { border-color: #dc2626; box-shadow: 0 0 0 4px rgba(220,38,38,.15); }
+#oqcPrintPages { display: none; }
+
+/* LOT № date: dd-mm-yyyy text box + calendar button (the native date input only opens the picker) */
+.lot-pick { position: relative; display: flex; align-items: center; gap: 4px; }
+.lot-pick #oqcLot { flex: 1; min-width: 0; }
+.lot-btn { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 9px; background: rgba(5,150,105,.1); color: var(--accent-1); cursor: pointer; }
+.lot-btn:hover { background: rgba(5,150,105,.2); }
+.lot-btn svg.i { width: 16px; height: 16px; }
+#oqcLotPick { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+@media print { .lot-btn, #oqcLotPick { display: none !important; } }
+
+/* Date fields shown as DD-MM-YYYY (see enhanceDate in common.js): the native text is hidden, a label sits over it */
+.date-wrap { position: relative; display: inline-block; max-width: 100%; }
+.date-wrap > input[type="date"] { color: transparent; }
+.date-wrap > input[type="date"]::-webkit-datetime-edit { color: transparent; }
+.date-view { position: absolute; left: 0; top: 0; bottom: 0; display: flex; align-items: center; pointer-events: none; white-space: nowrap; color: var(--ink); }
+.date-view.empty { color: var(--muted); }
+@media print { .date-wrap > input[type="date"], .date-wrap > input[type="date"]::-webkit-datetime-edit { color: transparent; } .date-view { color: #000; } }
+
+
+/* SPEC editor: an empty row is fully blank (no ±) until you click into it or type */
+.spec-editor .spec-tol:not(:focus-within):has(input[data-spec]:placeholder-shown):has(input[data-plus]:placeholder-shown):has(input[data-minus]:placeholder-shown) .pm { visibility: hidden; }

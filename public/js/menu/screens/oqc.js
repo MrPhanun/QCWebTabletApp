@@ -34,9 +34,8 @@ function renderOQC(panel, opts = {}) {
         <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
       </label>
       <button class="btn-primary oqc-save" id="oqcSave" type="button" ${can('daily.add') || can('daily.edit') ? '' : 'disabled ' + TT('e.noPerm')}>${ico('save')}${T('b.save')}</button>
-      <button class="icon-btn" id="oqcFindBtn" type="button" aria-expanded="false" aria-controls="oqcFind">${ico('search')}${T('b.search')}</button>
+      <label class="oqc-ship">${T('o.shipDate')}<input type="date" id="oqcShip" aria-label="Shipment Date" required></label>
       <button class="icon-btn" id="oqcNew" type="button">${ico('sparkle')}${T('b.new')}</button>
-      <button class="icon-btn" id="oqcPrint" type="button" ${can('daily.excel') ? '' : 'hidden'}>${ico('excel')}${T('b.excel')}</button>
       <div class="oqc-pager" role="group" aria-label="Pages">
         <button class="icon-btn" id="oqcPrev" type="button" ${TT('t.prevPage')}>${svg('chev', 'i flip')}</button>
         <span class="oqc-pageno" id="oqcPageInfo" aria-live="polite">Page 1 / 1</span>
@@ -45,18 +44,6 @@ function renderOQC(panel, opts = {}) {
       </div>
       <span class="oqc-rec" id="oqcRec" data-state="new">New</span>
       <div class="msg" id="oqcMsg" role="status"></div>
-    </div>
-    <div class="oqc-find" id="oqcFind" hidden>
-      <div class="oqc-find-bar">
-        <label class="search">${svg('list')}<input id="oqcFindQ" type="search" ${P('ph.find')} aria-label="Search saved records"></label>
-        <span class="count" id="oqcFindCount"></span>
-        <span class="spinner" aria-hidden="true"></span>
-        <button class="icon-btn" id="oqcFindClose" type="button">${ico('x')}${T('b.close')}</button>
-      </div>
-      <div class="table-wrap"><table class="data">
-        <thead><tr>${['h.lot', 'h.box', 'h.itemCode', 'h.partNo', 'h.customer', 'h.checkDate', 'h.pages', 'h.status', 'h.total', 'h.lastSaved'].map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
-        <tbody id="oqcFindBody"></tbody>
-      </table></div>
     </div>
     <form class="oqc-sheet" id="oqcForm" autocomplete="off" onsubmit="return false">
       ${oqcHead(`<label>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}<input type="date" id="oqcDate" value="${today}"></label><small class="oqc-sheet-page">Page 1 / 1</small>`)}
@@ -68,6 +55,10 @@ function renderOQC(panel, opts = {}) {
               <button type="button" data-prob="Normal" aria-pressed="false">Normal</button>
               <button type="button" data-prob="Strict" aria-pressed="false">Strict</button>
             </div></td>`
+          : id === 'oqcLot'
+            ? `<td><div class="lot-pick"><input id="oqcLot" aria-label="${esc(en)}" inputmode="numeric" maxlength="10" ${P('ph.lotDate')} autocomplete="off">
+                <button type="button" class="lot-btn" id="oqcLotBtn" ${TT('t.pickDate')}>${svg('calendar')}</button>
+                <input type="date" id="oqcLotPick" tabindex="-1" aria-label="Lot date picker"></div></td>`
           : `<td><input id="${id}" aria-label="${esc(en)}"${id === 'oqcQty' || id === 'oqcSpot' ? ' inputmode="numeric"' : ''}></td>`).join('')}</tr>
       </table></div>
 
@@ -110,6 +101,7 @@ function renderOQC(panel, opts = {}) {
       </table></div>
     </form>`;
 
+  enhanceDates(panel);
   const $ = id => panel.querySelector('#' + id);
   const msg = (text, kind = 'err') => { $('oqcMsg').textContent = text; $('oqcMsg').className = 'msg ' + kind; };
   const setRes = (sel, v) => { sel.value = v; sel.dataset.v = v; };
@@ -287,7 +279,7 @@ function renderOQC(panel, opts = {}) {
       rec.box = box; rec.itemCode = item;
       $('oqcCustomer').value = '';
       $('oqcPart').value = label ? label.partNo : '';
-      $('oqcLot').value = label && label.lot ? label.lot : lot;
+      $('oqcLot').value = '';   // Lot № is a date (dd-mm-yyyy) typed or picked by hand
       $('oqcQty').value = label && label.qty != null ? String(label.qty) : /^\d+$/.test(qtyInCode) ? qtyInCode : '';
       $('oqcSpot').value = '';
       if (cur > 0) panel.querySelectorAll('select.mat-res').forEach(sel => setRes(sel, 'OK'));   // was a later page's "/"
@@ -329,7 +321,8 @@ function renderOQC(panel, opts = {}) {
   // copied from this page without its Length Check. Rows without a SPEC line are cleared.
   const PER_PAGE = 22;
   function fillSpec(spec) {
-    const byLine = new Map(((spec && spec.lengths) || []).map(l => [Number(l.line), l]));
+    // A SPEC line counts only when it has a Length Position; the other rows stay blank
+    const byLine = new Map(((spec && spec.lengths) || []).filter(l => String(l.position || '').trim()).map(l => [Number(l.line), l]));
     const need = Math.max(1, Math.ceil(Math.max(0, ...byLine.keys()) / PER_PAGE));
     pages[cur] = snapshot();
     while (pages.length < need) pages.push(withoutLengths(pages[cur]));
@@ -377,6 +370,32 @@ function renderOQC(panel, opts = {}) {
   });
   $('oqcScan').addEventListener('change', () => { if ($('oqcScan').value.trim() !== lastScan) scan(); });
   $('oqcScan').focus();
+
+  // LOT № is a date, dd-mm-yyyy: type digits (the dashes are added) or pick it with the calendar button
+  const lotIn = $('oqcLot'), lotPick = $('oqcLotPick');
+  const validLot = s => {
+    const m = String(s).match(/^(\d{2})-(\d{2})-(\d{4})$/); if (!m) return false;
+    const d = new Date(+m[3], +m[2] - 1, +m[1]);
+    return d.getFullYear() === +m[3] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[1];
+  };
+  lotIn.addEventListener('input', () => {
+    if (!/^[\d-]*$/.test(lotIn.value)) return;   // an older record's text Lot is left as it is
+    const d = lotIn.value.replace(/\D/g, '').slice(0, 8);
+    lotIn.value = d.length > 4 ? `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}-${d.slice(2)}` : d;
+  });
+  $('oqcLotBtn').onclick = () => {
+    const m = lotIn.value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    lotPick.value = m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+    try { lotPick.showPicker(); } catch { lotPick.focus(); lotPick.click(); }
+  };
+  lotPick.addEventListener('change', e => {
+    e.stopPropagation();
+    if (!lotPick.value) return;
+    const [y, m, d] = lotPick.value.split('-');
+    lotIn.value = `${d}-${m}-${y}`;
+    lotIn.classList.remove('missing');
+    lotIn.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 
   // Checked by / Inspector: a scanned staff badge "MKH-2398" becomes the Username of tbUser ID 2398;
   // anything else is kept as typed by hand
@@ -507,38 +526,34 @@ function renderOQC(panel, opts = {}) {
   $('oqcForm').addEventListener('change', e => e.target.classList.remove('missing'));
   $('oqcForm').addEventListener('click', e => { const g = e.target.closest('.oqc-prob'); if (g) g.classList.remove('missing'); });
 
-  // Print every page, one A4 sheet each — only when nothing is missing
-  $('oqcPrint').onclick = async () => {
+  // Every page must be complete before Excel / PDF. What is still empty, per page ([] = complete).
+  function missingProblems() {
     pages[cur] = snapshot();
-    clearMissing();
-    const problems = pages.map((snap, i) => {
+    return pages.map((snap, i) => {
       const tmp = $('oqcForm').cloneNode(true);
       applySnapshot(tmp, snap);
       return { page: i, miss: missingOn(tmp) };
     }).filter(x => x.miss.length);
-    if (problems.length) {
-      const first = problems[0].page;
-      if (first !== cur) goTo(first);
-      missingOn($('oqcForm')).forEach(m => m.el && m.el.classList.add('missing'));
-      const lines = problems.map(x => {
-        const labels = x.miss.map(m => m.label).filter(Boolean);
-        const shown = labels.slice(0, 8).map(esc).join(', ') + (labels.length > 8 ? ' ' + t('o.more', { n: labels.length - 8 }) : '');
-        return `<b>${esc(t('o.pageN', { n: x.page + 1 }))}:</b> ${shown}`;
-      });
-      await uiAlert({ icon: '📝', title: t('o.notReadyT'),
-        message: `${esc(t('o.notReadyM'))}<br><br>${lines.join('<br>')}`, ok: t('b.gotIt') });
-      const firstEl = panel.querySelector('.missing');
-      if (firstEl) { firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (firstEl.focus) firstEl.focus({ preventScroll: true }); }
-      return;
-    }
-    // Complete: download every page as an Excel file filled into "OQC Data.xlsx"
-    const named = pages.map(namedFromSnap);
-    const lot = named[0].lot || 'OQC';
-    try {
-      const file = await downloadExcel('oqc', `OQC_${lot}${rec.box ? '_' + rec.box : ''}`, named);
-      msg(t('o.excelDone', { file }), 'ok');
-    } catch (err) { msg(err.message); }
-  };
+  }
+  const problemLines = problems => problems.map(x => {
+    const labels = x.miss.map(m => m.label).filter(Boolean);
+    const shown = labels.slice(0, 8).map(esc).join(', ') + (labels.length > 8 ? ' ' + t('o.more', { n: labels.length - 8 }) : '');
+    return `<b>${esc(t('o.pageN', { n: x.page + 1 }))}:</b> ${shown}`;
+  });
+  // Outline what is empty in red and go to the first page that has gaps. true = nothing missing.
+  function showMissing() {
+    clearMissing();
+    const problems = missingProblems();
+    if (!problems.length) return true;
+    const first = problems[0].page;
+    if (first !== cur) goTo(first);
+    missingOn($('oqcForm')).forEach(m => m.el && m.el.classList.add('missing'));
+    msg(t('o.notReadyM'));
+    const firstEl = panel.querySelector('.missing');
+    if (firstEl) { firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (firstEl.focus) firstEl.focus({ preventScroll: true }); }
+    return false;
+  }
+
   // ---- Saved records: each page is stored with named fields (not positions), so later form changes keep old records readable
   let rec = { id: 0, box: '', itemCode: '' }, dirty = false;
   const canSave = can('daily.add') || can('daily.edit');
@@ -626,8 +641,18 @@ function renderOQC(panel, opts = {}) {
       $('oqcLot').classList.add('missing'); $('oqcLot').focus();
       return msg(t('o.needLot'));
     }
+    if (!validLot(h.lot)) {
+      if (cur !== 0) goTo(0);
+      $('oqcLot').classList.add('missing'); $('oqcLot').focus();
+      return msg(t('o.badLot'));
+    }
+    if (!$('oqcShip').value) {
+      $('oqcShip').classList.add('missing'); $('oqcShip').focus();
+      return msg(t('o.needShip'));
+    }
     const totals = named.map(n => n.total);
     const body = {
+      shipDate: $('oqcShip').value,
       lot: h.lot, box: rec.box, itemCode: rec.itemCode, partNo: h.partNo, customer: h.customer, checkDate: h.checkDate, qty: h.qty,
       probability: h.probability, inspector: h.inspector, checkedBy: h.checkedBy,
       total: totals.includes('NG') ? 'NG' : totals.length && totals.every(t => t === 'OK') ? 'OK' : '',
@@ -639,7 +664,6 @@ function renderOQC(panel, opts = {}) {
       const out = await api(id ? 'PUT' : 'POST', id ? `/api/oqc/records/${id}` : '/api/oqc/records', body);
       rec.id = out.id; dirty = false; setStatus();
       msg(t('o.saved', { id: rec.id, lot: h.lot, box: rec.box ? `, Box ${rec.box}` : '', n: pages.length, state: t(body.complete ? 'st.complete' : 'o.draftLong') }), 'ok');
-      if (!$('oqcFind').hidden) findRecords();
     } catch (err) {
       if (err.status === 409 && err.data && err.data.existingId) {
         const go = await uiConfirm({ tone: 'danger', icon: '🗂️', title: t('o.dupT'),
@@ -659,6 +683,7 @@ function renderOQC(panel, opts = {}) {
     applySnapshot($('oqcForm'), pages[0]);
     prob = pages[0].prob;
     rec = { id: r.id, box: r.box, itemCode: r.itemCode };
+    $('oqcShip').value = r.shipDate || '';
     dirty = false;
     clearMissing();
     showPages(); setStatus();
@@ -666,60 +691,24 @@ function renderOQC(panel, opts = {}) {
     return r;
   }
 
-  // Search panel
-  let findTimer = 0;
-  async function findRecords() {
-    try {
-      const list = await api('GET', `/api/oqc/records?q=${encodeURIComponent($('oqcFindQ').value.trim())}`);
-      $('oqcFindCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
-      const s2 = x => esc(String(x ?? ''));
-      $('oqcFindBody').innerHTML = list.map(r => `<tr class="${r.id === rec.id ? 'editing' : ''}">
-          <td class="num">${s2(r.lot)}</td><td>${s2(r.box)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
-          <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(r.checkDate)}</td><td class="num">${r.pageCount}</td>
-          <td><span class="pill ${r.complete ? 'done' : 'draft'}">${esc(t(r.complete ? 'st.complete' : 'st.draft'))}</span></td>
-          <td>${r.total ? `<span class="pill ${r.total === 'NG' ? 'ng' : 'ok'}">${r.total}</span>` : ''}</td>
-          <td class="meta">${s2(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
-          <td><div class="row-actions"><button class="icon-btn" data-open="${r.id}">${ico('folderOpen')}${T('b.open')}</button>${can('daily.delete')
-            ? `<button class="icon-btn del" data-del="${r.id}" data-label="${s2(r.lot)}${r.box ? ` / Box ${s2(r.box)}` : ''}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
-        </tr>`).join('') || `<tr><td colspan="11" class="empty-row">${esc(t($('oqcFindQ').value.trim() ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
-    } catch (err) { msg(err.message); }
-  }
-  function toggleFind(open) {
-    $('oqcFind').hidden = !open;
-    $('oqcFindBtn').setAttribute('aria-expanded', open);
-    if (open) { findRecords(); $('oqcFindQ').focus(); }
-  }
-  $('oqcFindBtn').onclick = () => toggleFind($('oqcFind').hidden);
-  $('oqcFindClose').onclick = () => toggleFind(false);
-  $('oqcFindQ').addEventListener('input', () => { clearTimeout(findTimer); findTimer = setTimeout(findRecords, 300); });
-  $('oqcFindBody').onclick = async e => {
-    // Delete a saved record (after asking); the open form stays, as a new unsaved record, when it was that record
-    const d = e.target.closest('[data-del]');
-    if (d) {
-      const id = Number(d.dataset.del), label = d.dataset.label;
-      if (!await uiConfirm({ tone: 'danger', icon: '🗑️', title: t('o.delT'), message: t('o.delM', { label: esc(label) }),
-        ok: t('b.delete'), cancel: t('b.cancel') })) return;
-      try {
-        await api('DELETE', `/api/oqc/records/${id}`);
-        if (id === rec.id) { rec.id = 0; markDirty(); setStatus(); }
-        msg(t('o.deleted', { label }), 'ok');
-        findRecords();
-      } catch (err) { msg(err.message); }
-      return;
-    }
-    const b = e.target.closest('[data-open]'); if (!b) return;
-    const id = Number(b.dataset.open);
-    if (id !== rec.id && dirty && !await confirmDiscard()) return;
-    try {
-      const r = await loadRecord(id);
-      toggleFind(false);
-      msg(t('o.openedRec', { id: r.id, lot: r.lot, box: r.box ? `, Box ${r.box}` : '', state: t(r.complete ? 'st.complete' : 'st.draft') }), 'ok');
-      $('oqcForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (err) { msg(err.message); }
-  };
   $('oqcSave').onclick = () => saveRecord();
   setStatus();
-  langHook = () => { setStatus(); showPages(); if (!$('oqcFind').hidden) findRecords(); };
+  // Search Draft / Save asks what is still empty in a record (it renders this screen off-screen to find out)
+  if (opts.report) {
+    loadRecord(opts.report.id).then(() => opts.report.done(problemLines(missingProblems()))).catch(err => opts.report.done(null, err));
+    return;
+  }
+  langHook = () => { setStatus(); showPages(); };
+  $('oqcShip').addEventListener('input', e => { e.target.classList.remove('missing'); markDirty(); });
+  $('oqcShip').addEventListener('change', e => { e.target.classList.remove('missing'); markDirty(); });
+  // Search Draft / Save sends a record here (Open) or asks for its PDF
+  if (pendingOqc) {
+    const job = pendingOqc; pendingOqc = null;
+    loadRecord(job.id).then(r => {
+      msg(t('o.openedRec', { id: r.id, lot: r.lot, box: r.box ? `, Box ${r.box}` : '', state: t(r.complete ? 'st.complete' : 'st.draft') }), 'ok');
+      if (job.check) showMissing();   // a draft: outline in red what is still to be filled in
+    }).catch(err => msg(err.message));
+  }
   if (opts.scan) { $('oqcScan').value = opts.scan; scan(); }
 
   $('oqcNew').onclick = async () => {

@@ -1,30 +1,76 @@
 const { sendJson, readJson } = require('../http');
 const { buildOqcWorkbook } = require('../excel-builder');
+const fs = require('fs');
+const { printXlsx, freeName, openFile } = require('../print-xlsx');
+const { config } = require('../config');
+const os = require('os');
+const path = require('path');
+
+// Printer the PDF button sends to (override with "pdfPrinter" in config/<env>.json)
+const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
+// Folder the PDF is saved in: the Downloads folder (where the Excel files go); override with "pdfFolder" in config/<env>.json
+const PDF_FOLDER = config.pdfFolder || path.join(os.homedir(), 'Downloads');
+// File name: OQC_<dd-mm-yyyy>.pdf (today)
+const pdfBase = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `OQC_${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`; };
+
+// Read and check the request shared by the Excel and PDF downloads: { fileName, itemList, pages } (null = already answered)
+async function readExportRequest(req, res, session, ext) {
+  if (!session) { sendJson(res, 401, { error: 'Not logged in' }); return null; }
+  if (req.method !== 'POST') { sendJson(res, 405, { error: 'Method not allowed' }); return null; }
+  let body;
+  try { body = await readJson(req, 2000000); } catch { sendJson(res, 400, { error: 'Invalid request' }); return null; }
+  const pages = Array.isArray(body.pages) ? body.pages : [];
+  const itemList = Array.isArray(body.itemList) ? body.itemList.slice(0, 9).map(x => [String(x[0] ?? ''), String(x[1] ?? '')]) : [];
+  if (!pages.length || pages.length > 50 || pages.some(p => !p || typeof p !== 'object')) { sendJson(res, 400, { error: 'Invalid request' }); return null; }
+  const name = (String(body.fileName || 'OQC').replace(/[^\w.-]+/g, '_').slice(0, 80) || 'OQC') + ext;
+  return { pages, itemList, name };
+}
+
+function sendFile(res, buf, name, type) {
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Content-Disposition': `attachment; filename="${name}"`,
+    'Content-Length': buf.length,
+    'Cache-Control': 'no-store'
+  });
+  res.end(Buffer.from(buf));
+}
 
 // Download as an Excel file: POST /api/excel/oqc (OQC Data Information -> "OQC Data.xlsx")
 // or /api/excel/spec (SPEC -> "Spec.xlsx"); body { fileName, itemList: [[Khmer, English], ...], pages: [page, ...] }
 async function handleOqcExcel(req, res, session, kind) {
-  if (!session) return sendJson(res, 401, { error: 'Not logged in' });
-  if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-  let body;
-  try { body = await readJson(req, 2000000); } catch { return sendJson(res, 400, { error: 'Invalid request' }); }
-  const pages = Array.isArray(body.pages) ? body.pages : [];
-  const itemList = Array.isArray(body.itemList) ? body.itemList.slice(0, 9).map(x => [String(x[0] ?? ''), String(x[1] ?? '')]) : [];
-  if (!pages.length || pages.length > 50 || pages.some(p => !p || typeof p !== 'object')) return sendJson(res, 400, { error: 'Invalid request' });
-  const name = (String(body.fileName || 'OQC').replace(/[^\w.-]+/g, '_').slice(0, 80) || 'OQC') + '.xlsx';
+  const r = await readExportRequest(req, res, session, '.xlsx');
+  if (!r) return;
   try {
-    const buf = await buildOqcWorkbook(pages, itemList, kind);
-    res.writeHead(200, {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${name}"`,
-      'Content-Length': buf.length,
-      'Cache-Control': 'no-store'
-    });
-    res.end(Buffer.from(buf));
+    // ?open=1 (Search Draft / Save): save it in the Downloads folder and open it in Excel on this PC
+    if (kind === 'oqc' && new URL(req.url, 'http://x').searchParams.get('open')) {
+      const file = freeName(PDF_FOLDER, r.name.replace(/\.xlsx$/, ''), '.xlsx');
+      fs.mkdirSync(PDF_FOLDER, { recursive: true });
+      fs.writeFileSync(file, Buffer.from(await buildOqcWorkbook(r.pages, r.itemList, 'oqc')));
+      openFile(file);
+      return sendJson(res, 200, { ok: true, file: path.basename(file), folder: path.dirname(file) });
+    }
+    sendFile(res, await buildOqcWorkbook(r.pages, r.itemList, kind), r.name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   } catch (err) {
     console.error('Excel export error:', err.message);
     sendJson(res, 500, { error: 'Could not create the Excel file' });
   }
 }
 
-module.exports = { handleOqcExcel };
+// PDF: POST /api/pdf/oqc, same body as the Excel download. The filled "OQC Data.xlsx" is made, then printed straight to the
+// "Microsoft Print to PDF" printer of the PC the server runs on, which writes OQC_<date>.pdf into the Downloads folder
+// without asking (an existing file is kept: OQC_<date> (2).pdf), then opens it in the PDF viewer.
+async function handleOqcPdf(req, res, session) {
+  const r = await readExportRequest(req, res, session, '.pdf');
+  if (!r) return;
+  try {
+    const saved = await printXlsx(await buildOqcWorkbook(r.pages, r.itemList, 'oqc'), PDF_PRINTER, PDF_FOLDER, pdfBase());
+    openFile(saved);   // show the PDF
+    sendJson(res, 200, { ok: true, printer: PDF_PRINTER, file: path.basename(saved), folder: path.dirname(saved) });
+  } catch (err) {
+    console.error('PDF print error:', err.message);
+    sendJson(res, 500, { error: `Could not print to ${PDF_PRINTER} — Microsoft Excel and that printer are needed on the server PC` });
+  }
+}
+
+module.exports = { handleOqcExcel, handleOqcPdf };
