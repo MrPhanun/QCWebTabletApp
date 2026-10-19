@@ -29,6 +29,7 @@ const materialKey = k => 'Material ' + k[0].toUpperCase() + k.slice(1);
 // A box missing from the template falls back to the first cell of its MATERIAL range.
 const SPEC_TEXTBOX = { wire: ['Wire', 'TextBox 11'], terminal: ['Terminal', 'TextBox 14'], housing: ['Housing', 'TextBox 12'], other: ['Other', 'TextBox 13'] };
 
+const colName = n => { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
 const colNum = c => c.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
 const colLetter = n => { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
 const asNum = v => (v !== '' && v != null && Number.isFinite(Number(v)) ? Number(v) : v);
@@ -118,6 +119,35 @@ function diagonalStyle(ctx, s) {
 // A number only when it reads back exactly the same ("440" yes, "4.0" and "007" stay text)
 const exactNum = v => { const t = String(v ?? '').trim(); return t !== '' && Number.isFinite(Number(t)) && String(Number(t)) === t ? Number(t) : String(v ?? ''); };
 
+// A SPEC "100 (+10/-5)" written as on the screen: "100 ±" with 10 above 5 beside it. The template's merged SPEC box (3 cells) is split
+// into "100 ±" (first two cells) and the stacked tolerance (last cell, two small lines); the outer border stays, no line between them.
+// Anything else (30±5, (60)) goes into the whole box as before.
+const SPEC_TOL = /^\s*(\d+(?:\.\d+)?)\s*\(\s*\+\s*(\d+(?:\.\d+)?)\s*\/\s*-\s*(\d+(?:\.\d+)?)\s*\)\s*$/;
+function specSplitStyles(ctx) {
+  if (ctx.cache && ctx.cache.spec) return ctx.cache.spec;
+  ctx.cache = ctx.cache || {};
+  const edge = (n, open) => `<border><left${open === 'L' ? '' : ' style="thin"'}>${open === 'L' ? '' : '<color indexed="64"/>'}</left><right${open === 'R' ? '' : ' style="thin"'}>${open === 'R' ? '' : '<color indexed="64"/>'}</right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>`;
+  const nB = +ctx.styles.match(/<borders count="(\d+)"/)[1], nF = +ctx.styles.match(/<fonts count="(\d+)"/)[1];
+  ctx.styles = ctx.styles
+    .replace(/<borders count="\d+">([\s\S]*?)<\/borders>/, (m, b) => `<borders count="${nB + 2}">${b}${edge(0, 'R')}${edge(0, 'L')}</borders>`)
+    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 1}"${a}>${b}<font><b/><sz val="9"/><name val="Cambria"/><family val="1"/></font></fonts>`);
+  const left = addXf(ctx, `<xf numFmtId="0" fontId="22" fillId="0" borderId="${nB}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`);
+  const right = addXf(ctx, `<xf numFmtId="0" fontId="${nF}" fillId="0" borderId="${nB + 1}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`);
+  return (ctx.cache.spec = { left, right });
+}
+function setSpec(sheet, side, row, spec, ctx) {
+  const m = String(spec ?? '').match(SPEC_TOL);
+  const [c1, c3] = side.spec, c2 = colName(colNum(c1) + 1);
+  if (!m || !ctx) return setCell(sheet, `${c1}${row}`, spec);
+  const st = specSplitStyles(ctx);
+  sheet = sheet.replace(`<mergeCell ref="${c1}${row}:${c3}${row}"/>`, `<mergeCell ref="${c1}${row}:${c2}${row}"/>`);
+  sheet = useStyle(useStyle(sheet, `${c1}${row}`, st.left), `${c2}${row}`, st.left);
+  sheet = useStyle(sheet, `${c3}${row}`, st.right);
+  sheet = setCell(sheet, `${c1}${row}`, `${m[1]} ±`);
+  return setCell(sheet, `${c3}${row}`, `${m[2]}
+${m[3]}`);
+}
+
 // ---- OQC Data Information: values pasted into the template's own cells, nothing else changed ----
 function fillOqcSheet(sheet, d, itemList, ctx) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
@@ -164,7 +194,7 @@ function fillOqcSheet(sheet, d, itemList, ctx) {
       side.samples.forEach(([c1, c2], k) => { if (!(slash && k >= 3)) centerBox(c1, c2, r); });
       if (!l) continue;
       set(`${side.pos[0]}${r}`, exactNum(l.position));
-      set(`${side.spec[0]}${r}`, l.spec);
+      sheet = setSpec(sheet, side, r, l.spec, ctx);
       side.samples.forEach(([c1], k) => set(`${c1}${r}`, exactNum((l.samples || [])[k])));
     }
     if (slash) {
@@ -215,7 +245,7 @@ function fillTextBox(xml, names, text) {
   });
 }
 
-function fillSpecSheet(sheet, d) {
+function fillSpecSheet(sheet, d, ctx) {
   sheet = setCell(sheet, 'A7', d.customer);
   sheet = setCell(sheet, 'I7', d.partNo);
   const byNo = new Map((d.lengths || []).map(l => [Number(l.no), l]));
@@ -224,7 +254,7 @@ function fillSpecSheet(sheet, d) {
       const l = byNo.get(t * ROWS + i + 1);
       if (!l) continue;
       sheet = setCell(sheet, `${side.pos[0]}${FIRST_LEN_ROW + i}`, l.position);
-      sheet = setCell(sheet, `${side.spec[0]}${FIRST_LEN_ROW + i}`, l.spec);
+      sheet = setSpec(sheet, side, FIRST_LEN_ROW + i, l.spec, ctx);
     }
   });
   return sheet;
@@ -320,13 +350,13 @@ async function buildSheetWorkbook(tpl, pages, fill) {
 
 // SPEC: the material text goes into its text box, or into the box's first cell when the template has no such text box
 async function buildSpecWorkbook(pages) {
-  const buf = await buildSheetWorkbook(TEMPLATES.spec, pages, (sheet, d, drawing) => {
+  const buf = await buildSheetWorkbook(TEMPLATES.spec, pages, (sheet, d, drawing, ctx) => {
     for (const [k, names] of Object.entries(SPEC_TEXTBOX)) {
       const text = (d.material || {})[k] || '';
       if (hasShape(drawing, names)) drawing = fillTextBox(drawing, names, text);
       else sheet = setCell(sheet, MATERIAL[k].split(':')[0], text);
     }
-    return { sheet: fillSpecSheet(sheet, d), drawing };
+    return { sheet: fillSpecSheet(sheet, d, ctx), drawing };
   });
   return stackPages(buf, pages[0].partNo);
 }

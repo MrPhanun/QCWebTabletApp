@@ -76,7 +76,7 @@ function renderDraft(panel) {
     const id = Number(btn.dataset.open || btn.dataset.excel || btn.dataset.pdf || btn.dataset.del);
     const r = list.find(x => x.id === id); if (!r) return;
     if (btn.dataset.open) return gotoOQC(id, false, !r.complete);
-    // PDF: the filled "OQC Data.xlsx" is printed to a PDF (Microsoft Print to PDF) and downloaded
+    // PDF: the filled "OQC Data.xlsx" is printed to a PDF (Microsoft Print to PDF) and saved on this computer
     if (btn.dataset.pdf) {
       try {
         if (!await needComplete(r)) return;
@@ -91,7 +91,7 @@ function renderDraft(panel) {
       try {
         if (!await needComplete(r)) return;
         const full = await api('GET', `/api/oqc/records/${id}`);
-        const file = await downloadExcel('oqc', `OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
+        const file = await openExcel(`OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
         msg(t('o.excelDone', { file }), 'ok');
       } catch (err) { msg(err.message); }
       return;
