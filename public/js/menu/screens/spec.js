@@ -250,8 +250,8 @@ function renderSpec(panel) {
       lengths: lines.filter(l => Math.ceil(l.no / PER_PAGE) === p + 1)
         .map(l => ({ no: l.no - p * PER_PAGE, position: l.position || '', spec: specText(l), samples: [] })) }));
     try {
-      const out = await openExcel(`SPEC_${code || r.partNo || 'new'}`, pages, 'spec');
-      msg(t('o.fileOpened', { file: out.file, folder: out.folder }), 'ok');
+      const file = await downloadExcel('spec', `SPEC_${code || r.partNo || 'new'}`, pages);
+      msg(t('o.excelDone', { file }), 'ok');
     } catch (err) { msg(err.message); }
   }
   $('scPrint').onclick = () => specExcel(formData(), $('scPart').value.trim());

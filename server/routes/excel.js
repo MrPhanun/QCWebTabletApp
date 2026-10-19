@@ -1,21 +1,12 @@
 const { sendJson, readJson } = require('../http');
 const { buildOqcWorkbook } = require('../excel-builder');
 const fs = require('fs');
-const { printXlsx, freeName, openFile } = require('../print-xlsx');
+const { printXlsx } = require('../print-xlsx');
 const { config } = require('../config');
 const path = require('path');
 
 // Printer the PDF button sends to (override with "pdfPrinter" in config/<env>.json)
 const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
-// Files are saved on the PC the server runs on: <Desktop>\Report\OQC (Excel and PDF) and <Desktop>\Report\SPEC, created when missing.
-// Override the Report folder with "pdfFolder" in config/<env>.json
-const desktop = () => {
-  const home = require('os').homedir();
-  return [path.join(home, 'Desktop'), path.join(home, 'OneDrive', 'Desktop')].find(d => fs.existsSync(d)) || path.join(home, 'Desktop');
-};
-const REPORT_FOLDER = config.pdfFolder || path.join(desktop(), 'Report');
-const OQC_FOLDER = () => path.join(REPORT_FOLDER, 'OQC');
-const SPEC_FOLDER = () => path.join(REPORT_FOLDER, 'SPEC');
 // File name: OQC_<dd-mm-yyyy>.pdf (today)
 const pdfBase = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `OQC_${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`; };
 
@@ -48,15 +39,6 @@ async function handleOqcExcel(req, res, session, kind) {
   const r = await readExportRequest(req, res, session, '.xlsx');
   if (!r) return;
   try {
-    // ?open=1 (Search Draft / Save): save it in the Report folder and open it in Excel on this PC
-    if (new URL(req.url, 'http://x').searchParams.get('open')) {
-      const folder = kind === 'spec' ? SPEC_FOLDER() : OQC_FOLDER();
-      fs.mkdirSync(folder, { recursive: true });
-      const file = freeName(folder, r.name.replace(/\.xlsx$/, ''), '.xlsx');
-      fs.writeFileSync(file, Buffer.from(await buildOqcWorkbook(r.pages, r.itemList, kind)));
-      openFile(file);
-      return sendJson(res, 200, { ok: true, file: path.basename(file), folder: path.dirname(file) });
-    }
     sendFile(res, await buildOqcWorkbook(r.pages, r.itemList, kind), r.name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   } catch (err) {
     console.error('Excel export error:', err.message);
@@ -64,22 +46,19 @@ async function handleOqcExcel(req, res, session, kind) {
   }
 }
 
-// PDF: POST /api/pdf/oqc, same body as the Excel download. The filled "OQC Data.xlsx" is made, then printed straight to the
-// "Microsoft Print to PDF" printer of the PC the server runs on, which writes OQC_<date>.pdf into the Report folder
-// without asking (an existing file is kept: OQC_<date> (2).pdf), then opens it in the PDF viewer.
+// PDF: POST /api/pdf/oqc, same body as the Excel download. The filled "OQC Data.xlsx" is made, printed to the
+// "Microsoft Print to PDF" printer of the PC the server runs on (into a temporary folder), and the PDF is sent back as a download.
 async function handleOqcPdf(req, res, session) {
   const r = await readExportRequest(req, res, session, '.pdf');
   if (!r) return;
+  const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qc-pdf-'));
   try {
-    const folder = OQC_FOLDER();
-    fs.mkdirSync(folder, { recursive: true });
-    const saved = await printXlsx(await buildOqcWorkbook(r.pages, r.itemList, 'oqc'), PDF_PRINTER, folder, pdfBase());
-    openFile(saved);   // show the PDF
-    sendJson(res, 200, { ok: true, printer: PDF_PRINTER, file: path.basename(saved), folder: path.dirname(saved) });
+    const saved = await printXlsx(await buildOqcWorkbook(r.pages, r.itemList, 'oqc'), PDF_PRINTER, dir, pdfBase());
+    sendFile(res, fs.readFileSync(saved), r.name, 'application/pdf');
   } catch (err) {
     console.error('PDF print error:', err.message);
     sendJson(res, 500, { error: `Could not print to ${PDF_PRINTER} — ${err.message}` });
-  }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 module.exports = { handleOqcExcel, handleOqcPdf };
