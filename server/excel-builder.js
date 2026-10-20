@@ -8,7 +8,7 @@ const JSZip = require('jszip');
 // OQC Data Information uses the "OQC Data Information" sheet of its template file (the file also holds a "Spec" sheet);
 // the SPEC page uses the print template
 const TEMPLATES = {
-  oqc: { file: path.join(__dirname, '..', 'templates', 'OQC Data.xlsx'), sheet: 'OQC Data Information' },
+  oqc: { file: path.join(__dirname, '..', 'templates', 'OQC Data.xlsx'), sheet: 'OQC Data Information', drawing: true },
   spec: { file: path.join(__dirname, '..', 'templates', 'Spec.xlsx'), sheet: null }
 };
 const ROWS = 11;              // length rows per table (№ 1-11 left, 12-22 right)
@@ -101,16 +101,16 @@ function centeredStyle(ctx, s) {
   return ctx.cache[key] ?? (ctx.cache[key] = addXf(ctx, centerXf(xfList(ctx.styles)[+s])));
 }
 // Style index s, centered, with its border plus one thin diagonal line from bottom-left to top-right
-function diagonalStyle(ctx, s) {
+function diagonalStyle(ctx, s, down = false) {
   ctx.cache = ctx.cache || {};
-  const key = 'd' + s;
+  const key = (down ? 'D' : 'd') + s;
   if (ctx.cache[key] !== undefined) return ctx.cache[key];
   const xf = xfList(ctx.styles)[+s];
   const borders = ctx.styles.match(/<borders\b[^>]*>([\s\S]*?)<\/borders>/)[1].match(/<border\b[^>]*?(?:\/>|>[\s\S]*?<\/border>)/g) || [];
   const diagonal = '<diagonal style="thin"><color rgb="FF000000"/></diagonal>';
   let b = borders[+((xf.match(/\bborderId="(\d+)"/) || [])[1] || 0)] || '<border/>';
   if (/\/>$/.test(b) && !b.includes('</border>')) b = '<border><left/><right/><top/><bottom/><diagonal/></border>';
-  b = b.replace(/<border\b[^>]*?>/, '<border diagonalUp="1">');
+  b = b.replace(/<border\b[^>]*?>/, down ? '<border diagonalDown="1">' : '<border diagonalUp="1">');
   b = /<diagonal\b/.test(b) ? b.replace(/<diagonal\b[^>]*\/>|<diagonal\b[^>]*>[\s\S]*?<\/diagonal>/, diagonal) : b.replace('</border>', diagonal + '</border>');
   ctx.styles = ctx.styles.replace(/<borders count="\d+">([\s\S]*?)<\/borders>/, (m, body) => `<borders count="${borders.length + 1}">${body}${b}</borders>`);
   const withBorder = centerXf(xf).replace(/\s*borderId="\d+"/, '').replace(/\s*applyBorder="[^"]*"/, '').replace(/<xf\b/, `<xf borderId="${borders.length}" applyBorder="1"`);
@@ -160,7 +160,10 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   // 1) Material check: each material's result, and its text one line per row
   // (records saved before the per-material results have one 'Material check' result for all four)
   for (const [k, ref] of Object.entries(MATERIAL_RESULT)) set(ref, items[materialKey(k)] ?? items['Material check'] ?? '');
-  for (const [k, rows] of textBoxes ? [] : Object.entries(MATERIAL_ROWS)) {
+  for (const [k, rows] of Object.entries(MATERIAL_ROWS)) {
+    // Not used ("/"): no text, a line shape is drawn over the box instead (see addMaterialLines)
+    if (String((d.material || {})[k] || '') === '/') continue;
+    if (textBoxes) continue;
     const lines = String((d.material || {})[k] || '').split(/\r?\n/);
     if (lines.length > rows.length) lines.splice(rows.length - 1, lines.length - rows.length + 1, lines.slice(rows.length - 1).join(' '));
     lines.forEach((line, i) => set(`C${rows[i]}`, line));
@@ -215,7 +218,35 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   return sheet;
 }
 
+
+// A material that is not used ("/"): one straight line shape over its whole text area, bottom-left to top-right.
+// Added to the sheet's drawing (anchored to the cells, so it follows the rows when pages are stacked).
+function addMaterialLines(drawing, d) {
+  const anchors = [];
+  Object.entries(MATERIAL).forEach(([k, range], i) => {
+    if (String((d.material || {})[k] || '') !== '/') return;
+    // The template (Spec.xlsx) has its own hidden line shape per material ("TerminalLine", ...): it is made visible
+    const own = [k[0].toUpperCase() + k.slice(1) + 'Line'];
+    if (hasShape(drawing, own)) {
+      // ... and stretched over the material's whole text area, corner to corner
+      const [, c1, r1, c2, r2] = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+      const box = `<xdr:from><xdr:col>${colNum(c1) - 1}</xdr:col><xdr:colOff>9525</xdr:colOff><xdr:row>${+r1 - 1}</xdr:row><xdr:rowOff>9525</xdr:rowOff></xdr:from><xdr:to><xdr:col>${colNum(c2)}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${+r2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>`;
+      drawing = drawing.replace(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g,
+        a => hasShape(a, own) ? unhide(a).replace(/<xdr:from>[\s\S]*?<\/xdr:to>/, box) : a);
+      return;
+    }
+    const [, c1, r1, c2, r2] = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+    const pt = (c, r) => `<xdr:col>${c}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${r}</xdr:row><xdr:rowOff>0</xdr:rowOff>`;
+    anchors.push(`<xdr:twoCellAnchor><xdr:from>${pt(colNum(c1) - 1, +r1 - 1)}</xdr:from><xdr:to>${pt(colNum(c2), +r2)}</xdr:to>`
+      + `<xdr:cxnSp macro=""><xdr:nvCxnSpPr><xdr:cNvPr id="${900 + i}" name="Not used ${k}"/><xdr:cNvCxnSpPr/></xdr:nvCxnSpPr>`
+      + `<xdr:spPr><a:xfrm flipV="1"><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom>`
+      + `<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln></xdr:spPr></xdr:cxnSp><xdr:clientData/></xdr:twoCellAnchor>`);
+  });
+  return anchors.length ? drawing.replace('</xdr:wsDr>', anchors.join('') + '</xdr:wsDr>') : drawing;
+}
+
 // ---- SPEC: the original "Spec.xlsx", untouched except for the data written into it ----
+const unhide = a => a.replace(/(<xdr:cNvPr\b[^>]*?)\s+hidden="1"/, '$1');
 // Does this drawing XML (or one shape anchor of it) have a shape with one of these names?
 const hasShape = (xml, names) => names.some(name =>
   new RegExp(`<xdr:cNvPr\\b[^>]*\\sname="${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'i').test(xml));
@@ -228,6 +259,7 @@ function fillTextBox(xml, names, text) {
   const tag = name => new RegExp(`<a:${name}\\b[^>]*/>|<a:${name}\\b[^>]*>[\\s\\S]*?</a:${name}>`);
   return xml.replace(anchors, a => {
     if (!hasShape(a, names)) return a;
+    if (String(text || '').trim()) a = unhide(a);   // the template keeps its text boxes hidden until they have text
     return a.replace(/(<xdr:txBody>[\s\S]*?<a:lstStyle\/>)([\s\S]*?)(<\/xdr:txBody>)/, (m, head, body, tail) => {
       const paras = body.match(/<a:p>[\s\S]*?<\/a:p>|<a:p\/>/g) || [];
       const textOf = p => [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map(t => t[1]).join('');
@@ -298,9 +330,21 @@ async function buildSheetWorkbook(tpl, pages, fill) {
   const sheetTag = wb.match(/<sheet\b[^>]*\/>/)[0];
   const sheetPath = partOf(relTag(sheetTag.match(/\br:id="([^"]+)"/)[1]));
   const relsPath = sheetPath.replace(/([^/]+)$/, '_rels/$1.rels');
-  const sheet1 = await read(sheetPath);
+  let sheet1 = await read(sheetPath);
   const relsFile = zip.file(relsPath);
-  const rels1 = relsFile ? await relsFile.async('string') : '';
+  let rels1 = relsFile ? await relsFile.async('string') : '';
+  // A template without a drawing (OQC Data) gets an empty one, so shapes (the "not used" lines) can be added
+  if (tpl.drawing && !/Target="\.\.\/drawings\//.test(rels1)) {
+    // The template's shapes may sit on another sheet of the file (e.g. its "Spec" sheet): that drawing is used for this sheet too
+    const donor = zip.file('xl/drawings/drawing1.xml');
+    if (!donor) zip.file('xl/drawings/drawing1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"></xdr:wsDr>');
+    rels1 = (rels1 || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>')
+      .replace('</Relationships>', '<Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+    zip.file(relsPath, rels1);
+    if (!types.includes('/xl/drawings/drawing1.xml')) types = types.replace('</Types>', '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
+    const at = sheet1.search(/<(legacyDrawing|legacyDrawingHF|drawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b|<\/worksheet>/);
+    sheet1 = sheet1.slice(0, at) + '<drawing r:id="rIdDrw1"/>' + sheet1.slice(at);
+  }
   const drawingTarget = (rels1.match(/Target="\.\.\/drawings\/([^"]+)"/) || [])[1];
   const drawing1 = drawingTarget ? await read(`xl/drawings/${drawingTarget}`) : '';
   const printerTarget = (rels1.match(/Target="\.\.\/printerSettings\/([^"]+)"/) || [])[1];
@@ -378,15 +422,15 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
   if (kind === 'oqc' && pages[0].type === 'First Slot') {
     const buf = await buildSheetWorkbook(TEMPLATES.spec, pages, (sheet, d, drawing, ctx) => {
       for (const [k, names] of Object.entries(SPEC_TEXTBOX)) {
-        const text = (d.material || {})[k] || '';
+        const m = (d.material || {})[k] || '', text = m === '/' ? '' : m;   // "/" is drawn as a line instead
         if (hasShape(drawing, names)) drawing = fillTextBox(drawing, names, text);
         else sheet = setCell(sheet, MATERIAL[k].split(':')[0], text);
       }
-      return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing };
+      return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing: addMaterialLines(drawing, d) };
     });
     return stackPages(buf, pages[0].partNo);
   }
-  const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing }));
+  const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing: addMaterialLines(drawing, d) }));
   return stackPages(buf, pages[0].partNo);
 }
 

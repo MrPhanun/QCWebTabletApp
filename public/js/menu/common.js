@@ -149,8 +149,7 @@ async function downloadFile(url, fileName, ext, pages) {
     }
     const blob = await res.blob();
     const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || `${fileName}${ext}`;
-    const saved = await saveReport(url.includes('/spec') ? 'SPEC' : 'OQC', name, blob);
-    if (saved) return saved;
+    // Plain browser download (no folder dialog); saveReport (Report\OQC folder picker) is no longer used
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;

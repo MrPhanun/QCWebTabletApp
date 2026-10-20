@@ -514,13 +514,18 @@ function renderOQC(panel, opts = {}) {
   showPages();
   panel.querySelectorAll('.oqc-len').forEach(markLength);   // blank rows without SPEC from the start
 
-  // ---- Before printing, every page must be complete (Remarks and the material text are optional)
+  // ---- Before printing, every page must be complete (Remarks is optional; material text needs text unless its result is "/")
   const CIRCLED = ['①', '②', '③', '④', '⑤'];
   function missingOn(root) {
     const miss = [];
     const need = (el, label) => { if (el && !String(el.value || '').trim()) miss.push({ el, label }); };
     need(root.querySelector('input[type="date"]'), fieldName('Check date'));
     ['CUSTOMER', 'PART №', 'LOT №', 'QUANTITY', 'SPOT CHECK'].forEach(a => need(root.querySelector(`input[aria-label="${a}"]`), fieldName(a)));
+    // Material text can't be blank, unless its result is "/" (not used: the box shows the diagonal line)
+    root.querySelectorAll('textarea[aria-label^="Material "]').forEach(ta => {
+      if (ta.closest('tr').querySelector('select.mat-res')?.value === '/') return;
+      need(ta, fieldName(ta.getAttribute('aria-label')));
+    });
     if (!root.querySelector('.oqc-prob button[aria-pressed="true"]')) miss.push({ el: root.querySelector('.oqc-prob'), label: fieldName('Probability') });
     root.querySelectorAll('select.res').forEach(sel => {
       if (sel.closest('.oqc-len') || sel.getAttribute('aria-label') === 'Total determination') return;

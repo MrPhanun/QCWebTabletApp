@@ -93,7 +93,7 @@ const STR = {
   // OQC Data Information
   'ph.scan': ['Scan label barcode', 'ស្កេនបាកូដ'], 'ph.badge': ['Scan badge or type', 'ស្កេនកាត ឬវាយបញ្ចូល'],
   'ph.find': ['Search Lot, Box, Item Code, Part No, Customer, Inspector…', 'ស្វែងរក Lot, Box, លេខកូដទំនិញ, Part No, អតិថិជន, អ្នកត្រួតពិនិត្យ…'],
-  'pg': ['Page {n} / {total}', 'ទំព័រ {n} / {total}'], 'st.complete': ['Complete', 'រួចរាល់'], 'st.draft': ['Draft', 'ព្រាង'],
+  'pg': ['Page {n} / {total}', 'ទំព័រ {n} / {total}'], 'st.complete': ['Can Print', 'អាចបោះពុម្ពបាន'], 'st.draft': ['Draft', 'ព្រាង'],
   'rec.count': ['{n} record{s}', '{n} កំណត់ត្រា'], 'rec.noMatch': ['No saved records match', 'រកមិនឃើញកំណត់ត្រាដែលត្រូវគ្នាទេ'],
   'rec.none': ['No saved records yet', 'មិនទាន់មានកំណត់ត្រាដែលបានរក្សាទុកទេ'],
   'st.new': ['New', 'ថ្មី'], 'st.newUnsaved': ['New · not saved', 'ថ្មី · មិនទាន់រក្សាទុក'], 'st.saved': ['Saved #{id}', 'បានរក្សាទុក #{id}'],
