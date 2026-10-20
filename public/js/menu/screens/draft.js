@@ -23,6 +23,12 @@ function renderDraft(panel) {
         <button type="button" data-type="First Slot" aria-pressed="false">${T('type.firstSlot')}</button>
         <button type="button" data-type="Sample" aria-pressed="false">${T('type.sample')}</button>
       </div>
+      <label class="flt-pdf"><span>${T('h.pdfStatus')}</span>
+        <div class="seg type-seg" id="drPdf" role="group" aria-label="Filter by PDF Status" data-value="">
+          <button type="button" data-v="" aria-pressed="true">${T('st.all')}</button>
+          <button type="button" data-v="draft" aria-pressed="false">${T('st.draft')}</button>
+          <button type="button" data-v="printed" aria-pressed="false">${T('st.printed')}</button>
+        </div></label>
       <button class="btn-primary" id="drSearch" type="button">${ico('search')}${T('b.search')}</button>
       <span class="count" id="drCount"></span>
       <div class="msg" id="drMsg" role="status"></div>
@@ -53,11 +59,11 @@ function renderDraft(panel) {
     } catch { /* the list is only a help: search still works */ }
   }
   async function search() {
-    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, type: $('drType').dataset.value, customer: $('drCust').value });
+    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, type: $('drType').dataset.value, customer: $('drCust').value, pdf: $('drPdf').dataset.value });
     try {
       list = await api('GET', `/api/oqc/records?${qs}`);
       $('drCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
-      const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drType').dataset.value || $('drCust').value;
+      const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drType').dataset.value || $('drCust').value || $('drPdf').dataset.value;
       $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}">
           <td class="num">${s2(r.lot)}</td><td>${s2(r.box)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
           <td>${typePill(r.type)}</td>
@@ -136,6 +142,12 @@ function renderDraft(panel) {
     const b = e.target.closest('button'); if (!b) return;
     $('drType').dataset.value = b.dataset.type;
     $('drType').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    search();
+  });
+  $('drPdf').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('drPdf').dataset.value = b.dataset.v;
+    $('drPdf').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
     search();
   });
   $('drCust').addEventListener('change', search);

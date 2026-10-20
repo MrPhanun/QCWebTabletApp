@@ -120,14 +120,15 @@ async function handleOqcRecords(req, res, session, id) {
       const text = String(q.get('q') || '').trim().slice(0, 100);
       const like = '%' + text.replace(/[\\%_[]/g, c => '\\' + c) + '%';
       const type = ['Normal', 'First Slot', 'Sample'].includes(q.get('type')) ? q.get('type') : '';
+      const pdf = q.get('pdf') === 'printed' ? 1 : q.get('pdf') === 'draft' ? 0 : null;   // PDF Status: Printed / Draft / any
       const customer = String(q.get('customer') || '').trim().slice(0, 200);
       const day = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !isNaN(Date.parse(v)) ? v : null;
       const { recordset } = await pool.request().input('text', sql.NVarChar(100), text).input('like', sql.NVarChar(210), like)
-        .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('from', sql.Date, day(q.get('from'))).input('to', sql.Date, day(q.get('to')))
+        .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('pdf', sql.Bit, pdf).input('from', sql.Date, day(q.get('from'))).input('to', sql.Date, day(q.get('to')))
         .query(`SELECT TOP 200 ${REC_COLS} FROM OqcRecord
           WHERE (@text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
              OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\')
-            AND (@type = '' OR [Type] = @type) AND (@customer = '' OR Customer = @customer)
+            AND (@type = '' OR [Type] = @type) AND (@customer = '' OR Customer = @customer) AND (@pdf IS NULL OR PdfPrinted = @pdf)
             AND (@from IS NULL OR ShipmentDate >= @from) AND (@to IS NULL OR ShipmentDate <= @to)
           ORDER BY ShipmentDate DESC, UpdateDate DESC`);
       return sendJson(res, 200, recordset);
