@@ -4,6 +4,8 @@ const fs = require('fs');
 const { printXlsx } = require('../print-xlsx');
 const { config } = require('../config');
 const path = require('path');
+const { sql, getPool } = require('../db');
+const { recordFile, saveRecordFile } = require('../record-files');
 
 // Printer the PDF button sends to (override with "pdfPrinter" in config/<env>.json)
 const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
@@ -61,4 +63,43 @@ async function handleOqcPdf(req, res, session) {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
-module.exports = { handleOqcExcel, handleOqcPdf };
+// Download of a saved record: POST /api/oqc/records/:id/excel and /pdf, body { itemList }.
+// Printed (the file was made before and the record has not changed since): the stored file is sent again.
+// Draft: the file is made from the saved record, stored on the server, and the record becomes Printed for that file.
+async function handleRecordExport(req, res, session, id, kind) {
+  if (!session) return sendJson(res, 401, { error: 'Not logged in' });
+  if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+  let body;
+  try { body = await readJson(req, 200000); } catch { return sendJson(res, 400, { error: 'Invalid request' }); }
+  const itemList = Array.isArray(body.itemList) ? body.itemList.slice(0, 9).map(x => [String(x[0] ?? ''), String(x[1] ?? '')]) : [];
+  const isPdf = kind === 'pdf', ext = isPdf ? '.pdf' : '.xlsx', flag = isPdf ? 'PdfPrinted' : 'ExcelPrinted', stamp = isPdf ? 'PdfDate' : 'ExcelDate';
+  try {
+    const pool = await getPool();
+    const rec = (await pool.request().input('id', sql.Int, id).query(
+      `SELECT LotNo, BoxNo, Data, UpdateDate, ${flag} AS printed FROM OqcRecord WHERE SysNo = @id`)).recordset[0];
+    if (!rec) return sendJson(res, 404, { error: 'This record no longer exists' });
+    const name = `OQC_${rec.LotNo}${rec.BoxNo ? '_' + rec.BoxNo : ''}`.replace(/[^\w.-]+/g, '_').slice(0, 80) + ext;
+    const type = isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const file = recordFile(id, ext);
+    if (rec.printed && fs.existsSync(file)) return sendFile(res, fs.readFileSync(file), name, type);
+
+    const pages = JSON.parse(rec.Data);
+    let buf;
+    if (isPdf) {
+      const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qc-pdf-'));
+      try { buf = fs.readFileSync(await printXlsx(await buildOqcWorkbook(pages, itemList, 'oqc'), PDF_PRINTER, dir, pdfBase())); }
+      finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    } else buf = await buildOqcWorkbook(pages, itemList, 'oqc');
+    saveRecordFile(id, ext, buf);
+    // Printed only if the record is still the one the file was made from; a save in the meantime keeps it Draft
+    const { rowsAffected } = await pool.request().input('id', sql.Int, id).input('upd', sql.DateTime, rec.UpdateDate).query(
+      `UPDATE OqcRecord SET ${flag} = 1, ${stamp} = GETDATE() WHERE SysNo = @id AND UpdateDate = @upd`);
+    if (!rowsAffected[0]) fs.rmSync(file, { force: true });
+    sendFile(res, buf, name, type);
+  } catch (err) {
+    console.error('Record export error:', err.message);
+    sendJson(res, 500, { error: isPdf ? `Could not print to ${PDF_PRINTER} — ${err.message}` : 'Could not create the Excel file' });
+  }
+}
+
+module.exports = { handleOqcExcel, handleOqcPdf, handleRecordExport };

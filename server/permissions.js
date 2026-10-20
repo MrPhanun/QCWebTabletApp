@@ -34,7 +34,7 @@ function permFor(urlPath, method) {
   if (/^\/api\/spec(\/\d+)?$/.test(urlPath)) return by({ GET: 'spec.view', POST: 'spec.add', PUT: 'spec.edit', DELETE: 'spec.delete' });
   if (/^\/api\/oqc\/records(\/\d+)?$/.test(urlPath)) return by({ GET: 'daily.view', POST: 'daily.add', PUT: 'daily.edit', DELETE: 'daily.delete' });
   if (urlPath === '/api/oqc/spec' || urlPath === '/api/oqc/label' || urlPath === '/api/user/name') return 'daily.view';
-  if (urlPath === '/api/excel/oqc' || urlPath === '/api/pdf/oqc') return 'daily.excel';
+  if (urlPath === '/api/excel/oqc' || urlPath === '/api/pdf/oqc' || /^\/api\/oqc\/records\/\d+\/(excel|pdf)$/.test(urlPath)) return 'daily.excel';
   if (urlPath === '/api/excel/spec') return 'spec.excel';
   if (/^\/api\/users(\/[^/]+)?$/.test(urlPath)) return by({ GET: 'users.view', POST: 'users.add', PUT: 'users.edit', DELETE: 'users.delete' });
   if (urlPath === '/api/permissions') return by({ GET: 'roles.view', PUT: 'roles.edit' });

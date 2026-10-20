@@ -8,7 +8,7 @@ const { getPerms, permFor } = require('./server/permissions');
 const { serveConfigJs, serveStatic } = require('./server/static');
 const { handleLogin, handleLogout, handleMe } = require('./server/routes/auth');
 const { handlePermissions } = require('./server/routes/permissions');
-const { handleOqcExcel, handleOqcPdf } = require('./server/routes/excel');
+const { handleOqcExcel, handleOqcPdf, handleRecordExport } = require('./server/routes/excel');
 const { handleUsers, handleUserName } = require('./server/routes/users');
 const { handleSpec } = require('./server/routes/spec');
 const { handleOqcRecords, handleOqcSpec, handleOqcLabel } = require('./server/routes/oqc');
@@ -41,6 +41,8 @@ http.createServer(async (req, res) => {
   if (urlPath === '/api/user/name') return handleUserName(req, res, getSession(req));
   const spm = urlPath.match(/^\/api\/spec(?:\/(\d+))?$/);
   if (spm) return handleSpec(req, res, getSession(req), spm[1] ? Number(spm[1]) : 0);
+  const rxm = urlPath.match(/^\/api\/oqc\/records\/(\d+)\/(excel|pdf)$/);
+  if (rxm) return handleRecordExport(req, res, getSession(req), Number(rxm[1]), rxm[2]);
   const orm = urlPath.match(/^\/api\/oqc\/records(?:\/(\d+))?$/);
   if (orm) return handleOqcRecords(req, res, getSession(req), orm[1] ? Number(orm[1]) : 0);
   if (urlPath === '/api/oqc/spec') return handleOqcSpec(req, res, getSession(req));

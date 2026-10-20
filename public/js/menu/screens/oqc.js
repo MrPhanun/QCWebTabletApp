@@ -40,6 +40,7 @@ function renderOQC(panel, opts = {}) {
         <button class="icon-btn" id="oqcPrev" type="button" ${TT('t.prevPage')}>${svg('chev', 'i flip')}</button>
         <span class="oqc-pageno" id="oqcPageInfo" aria-live="polite">Page 1 / 1</span>
         <button class="icon-btn next" id="oqcNext" type="button">${ico('filePlus')}${T('b.addPage')}</button>
+        <label class="oqc-sample"><input type="checkbox" id="oqcSample" class="sample-in"><span>Sample</span></label>
         <button class="icon-btn del" id="oqcDelPage" type="button" ${TT('t.removeThisPage')} hidden>${ico('fileMinus')}${T('b.removePage')}</button>
       </div>
       <span class="oqc-rec" id="oqcRec" data-state="new">New</span>
@@ -127,11 +128,14 @@ function renderOQC(panel, opts = {}) {
   // samples is out of SPEC, OK once one can be checked, blank otherwise; ④⑤ get "/" while they are struck out (not used)
   function checkLength(table) {
     const cols = markLength(table);
-    const slashed = table.classList.contains('slashed');
+    const sample = isSample(table);
     table.querySelectorAll('select.len-res').forEach((sel, k) =>
-      setRes(sel, slashed && k >= REQUIRED_SAMPLES ? '/' : cols[k].bad ? 'NG' : cols[k].checked ? 'OK' : ''));
+      setRes(sel, sample && k >= SAMPLE_COLS ? '/' : cols[k].bad ? 'NG' : cols[k].checked ? 'OK' : ''));
   }
-  const REQUIRED_SAMPLES = 3;   // ①②③ must be measured; ④⑤ are optional
+  // Sample ticked: only ①②③ are measured and ④⑤ are "/". Normal / First Slot (not ticked): all five ①②③④⑤ must be filled.
+  const SAMPLE_COLS = 3;
+  const isSample = table => table.closest('form')?.dataset.sample === '1';
+  const requiredSamples = table => isSample(table) ? SAMPLE_COLS : 5;
   // Colour out-of-SPEC samples red; returns per sample column how many samples could be checked / were NG
   function markLength(table) {
     const cols = OQC_CIRC.map(() => ({ checked: 0, bad: 0 }));
@@ -159,23 +163,21 @@ function renderOQC(panel, opts = {}) {
     slashUnused(table);
     return cols;
   }
-  // ①②③ measured and all within SPEC in every used row, and none of ④⑤ used: strike out the ④⑤ block with one diagonal line,
-  // from the top-right of ⑤ to the bottom-left of ④, like on paper. Each cell draws its piece of the line in %,
-  // so it stays straight at any size, including the printed sheet.
+  // Sample: ④⑤ are not measured: they are cleared, locked and struck out with one diagonal line, from the top-right of ⑤ to the
+  // bottom-left of ④, like on paper. Each cell draws its piece of the line in %, so it stays straight at any size, including the printed sheet.
   function slashUnused(table) {
     table.querySelectorAll('svg.slash').forEach(x => x.remove());
-    const rows = [...table.querySelectorAll('tbody tr:not(.sec)')];
-    const extra = rows.some(tr => [...tr.querySelectorAll('input.smp')].slice(REQUIRED_SAMPLES).some(i => i.value.trim() !== ''));
-    // Only rows with a SPEC are checked: each needs ①②③ measured and none of them red (out of SPEC)
-    const used = rows.filter(tr => tr.querySelector('[data-spec]').value.trim());
-    const allGood = used.length > 0 && used.every(tr => [...tr.querySelectorAll('input.smp')].slice(0, REQUIRED_SAMPLES)
-      .every(i => i.value.trim() !== '' && !i.classList.contains('ng')));
-    const on = allGood && !extra;
+    const on = isSample(table);
     table.classList.toggle('slashed', on);
+    const rows = [...table.querySelectorAll('tbody tr:not(.sec)')];
+    rows.forEach(tr => [...tr.querySelectorAll('input.smp')].slice(SAMPLE_COLS).forEach(i => {
+      if (on) { i.value = ''; i.classList.remove('ng'); }
+      i.readOnly = on; i.tabIndex = on ? -1 : 0;
+    }));
     if (!on) return;
-    const n = rows.length, cols = 5 - REQUIRED_SAMPLES;
+    const n = rows.length, cols = 5 - SAMPLE_COLS;
     rows.forEach((tr, r) => {
-      [...tr.querySelectorAll('td.smp')].slice(REQUIRED_SAMPLES).forEach((td, c) => {
+      [...tr.querySelectorAll('td.smp')].slice(SAMPLE_COLS).forEach((td, c) => {
         const x = y => ((cols - cols * y / n - c) * 100).toFixed(2) + '%';
         td.insertAdjacentHTML('beforeend', `<svg class="slash" aria-hidden="true"><line x1="${x(r)}" y1="0" x2="${x(r + 1)}" y2="100%"/></svg>`);
       });
@@ -192,6 +194,11 @@ function renderOQC(panel, opts = {}) {
     if (e.target.matches('input.spec')) e.target.closest('td').querySelector('[data-range]').value = '';
     const len = e.target.closest('.oqc-len');
     if (len) { checkLength(len); updateTotal(); }
+  });
+  // Sample tickbox: ④⑤ switch between "/" (Sample) and measured (Normal / First Slot)
+  $('oqcSample').addEventListener('change', () => {
+    $('oqcForm').dataset.sample = $('oqcSample').checked ? '1' : '';
+    panel.querySelectorAll('.oqc-len').forEach(checkLength); updateTotal(); markDirty();
   });
   $('oqcForm').addEventListener('change', e => {
     if (!e.target.matches('select.res')) return;
@@ -285,6 +292,7 @@ function renderOQC(panel, opts = {}) {
       if (cur > 0) panel.querySelectorAll('select.mat-res').forEach(sel => setRes(sel, 'OK'));   // was a later page's "/"
       pages = [null]; cur = 0;   // back to one page; the Part No's SPEC adds the pages it needs
       fillSpec(null);
+      formType = ''; setForm();
       // A new label is a new inspection: clear the previous label's samples and length results
       panel.querySelectorAll('.oqc-len input.smp').forEach(inp => { inp.value = ''; inp.classList.remove('ng'); });
       panel.querySelectorAll('.oqc-len select.res').forEach(sel => setRes(sel, ''));
@@ -337,12 +345,23 @@ function renderOQC(panel, opts = {}) {
         root.querySelector(`[data-range="${i}"]`).value = l ? l.range || '' : '';
       }
       if (p === cur) root.querySelectorAll('.oqc-len').forEach(markLength);
-      else pages[p] = { vals: fields(root).map(c => c.value), prob: snap.prob };
+      else pages[p] = { vals: fields(root).map(c => c.value), prob: snap.prob, sample: snap.sample };
     });
     showPages();
     return { lines: byLine.size, pages: need };
   }
   // Part No -> SPEC master (MstSpec): Customer, material text and length rows
+  // The Part No's SPEC Type picks the form: First Slot = the Spec form (First Lot, QC-RE-048), anything else = OQC Data (QC-RE-002).
+  // It is saved with every page, and the Excel / PDF use the matching template.
+  let formType = '';
+  function setForm() {
+    const f = OQC_FORMS[formType === 'First Slot' ? 'spec' : 'oqc'];
+    const title = panel.querySelector('.oqc-title');
+    title.querySelector('.km').textContent = f.km;
+    title.querySelector('b').textContent = `[${f.en}]`;
+    panel.querySelector('.oqc-ref small').innerHTML = f.ref;
+    $('oqcForm').dataset.form = formType === 'First Slot' ? 'first' : 'normal';
+  }
   let lastPart = '';
   async function lookupPart() {
     const part = $('oqcPart').value.trim();
@@ -351,7 +370,17 @@ function renderOQC(panel, opts = {}) {
     try {
       const r = await api('GET', `/api/oqc/spec?partNo=${encodeURIComponent(part)}`);
       if ($('oqcPart').value.trim() !== part) return;   // typed something else meanwhile
+      if (r.choices) {   // the Part No has more than one SPEC: choose which one this item needs
+        const pick = await uiChoose({ title: t('o.chooseSpecT'), message: esc(t('o.chooseSpecM', { part, n: r.choices.length })),
+          choices: r.choices.map(c => ({ value: c.partNo, label: c.partNo, sub: [c.customer, c.type === 'First Slot' ? t('type.firstSlot') : ''].filter(Boolean).join(' · ') })) });
+        lastPart = '';
+        if (!pick) return msg(t('o.specNotChosen', { part }));
+        $('oqcPart').value = pick;
+        return lookupPart();
+      }
+      if (r.partNo && r.partNo !== part) { $('oqcPart').value = r.partNo; lastPart = r.partNo; }
       if (r.customer) $('oqcCustomer').value = r.customer;
+      formType = r.type === 'First Slot' ? 'First Slot' : 'Normal'; setForm();
       const n = fillSpec(r);
       markDirty();
       msg([t('o.specFound', { part }), n.lines ? t('o.lines', { n: n.lines }) : '', n.pages > 1 ? t('o.specPages', { n: n.pages }) : '']
@@ -418,11 +447,11 @@ function renderOQC(panel, opts = {}) {
   // ---- Pages: each page is a snapshot of every field on the sheet. "Add page" on the last page adds a page that
   // copies the current one (header, inspection items, material check, footer) with an empty Length Check.
   let pages = [null], cur = 0;
-  const fields = root => [...root.querySelectorAll('input, select, textarea')];
-  const snapshot = () => ({ vals: fields($('oqcForm')).map(c => c.value), prob });
+  const fields = root => [...root.querySelectorAll('input, select, textarea')].filter(c => c.type !== 'checkbox');   // the Sample tickbox is kept apart, like Probability
+  const snapshot = () => ({ vals: fields($('oqcForm')).map(c => c.value), prob, sample: $('oqcSample').checked });
   // A copy of a page with an empty Length Check (Position, SPEC, samples, results)
   function withoutLengths(snap) {
-    const copy = { vals: [...snap.vals], prob: snap.prob };
+    const copy = { vals: [...snap.vals], prob: snap.prob, sample: snap.sample };
     fields($('oqcForm')).forEach((c, i) => {
       if (c.closest('.oqc-len')) copy.vals[i] = '';
       if (c.matches('select.mat-res')) copy.vals[i] = '/';   // later pages: material check "/"
@@ -438,6 +467,8 @@ function renderOQC(panel, opts = {}) {
       if (c.matches('select.res')) c.dataset.v = c.value;
     });
     setProbUI(root, snap.prob);
+    root.dataset.sample = snap.sample ? '1' : '';
+    if (root === $('oqcForm')) $('oqcSample').checked = !!snap.sample;
     root.querySelectorAll('.oqc-len').forEach(markLength);
   }
   function showPages() {
@@ -504,16 +535,15 @@ function renderOQC(panel, opts = {}) {
         if (!spec.value.trim()) return;
         used = true;
         if (!pos.value.trim()) miss.push({ el: pos, label: t('o.lenPos', { no }) });
-        const empty = [...tr.querySelectorAll('input.smp')].slice(0, REQUIRED_SAMPLES).map((inp, i) => inp.value.trim() ? null : { el: inp, i }).filter(Boolean);
+        const empty = [...tr.querySelectorAll('input.smp')].slice(0, requiredSamples(table)).map((inp, i) => inp.value.trim() ? null : { el: inp, i }).filter(Boolean);
         if (empty.length) {
           empty.forEach(x => miss.push({ el: x.el, label: null }));
           miss.push({ el: null, label: t('o.lenSample', { no, list: empty.map(x => CIRCLED[x.i]).join('') }) });
         }
       });
-      // Results of ①②③, and of ④⑤ when they were measured
+      // Results of ①②③ (Sample) or of all five ①..⑤ (Normal / First Slot)
       if (used) table.querySelectorAll('select.len-res').forEach((sel, k) => {
-        const measured = [...table.querySelectorAll(`tbody tr:not(.sec) td.smp:nth-child(${k + 4}) input`)].some(i => i.value.trim());
-        if (k < REQUIRED_SAMPLES || measured) need(sel, `${fieldName('Length Check result')} ${CIRCLED[k]}`);
+        if (k < requiredSamples(table)) need(sel, `${fieldName('Length Check result')} ${CIRCLED[k]}`);
       });
     });
     need(root.querySelector('select[aria-label="Total determination"]'), fieldName('Total Determination'));
@@ -583,6 +613,8 @@ function renderOQC(panel, opts = {}) {
       checkDate: v('input[type="date"]'), customer: v('input[aria-label="CUSTOMER"]'), partNo: v('input[aria-label="PART №"]'),
       lot: v('input[aria-label="LOT №"]'), qty: v('input[aria-label="QUANTITY"]'), spot: v('input[aria-label="SPOT CHECK"]'),
       probability: pressed ? pressed.dataset.prob : '',
+      type: formType,
+      sample: root.dataset.sample === '1',
       items: Object.fromEntries([...root.querySelectorAll('select.res')]
         .filter(x => !x.closest('.oqc-len') && x.getAttribute('aria-label') !== 'Total determination')
         .map(x => [x.getAttribute('aria-label').replace(/ result$/, ''), x.value])),
@@ -599,6 +631,7 @@ function renderOQC(panel, opts = {}) {
     set('input[type="date"]', d.checkDate); set('input[aria-label="CUSTOMER"]', d.customer); set('input[aria-label="PART №"]', d.partNo);
     set('input[aria-label="LOT №"]', d.lot); set('input[aria-label="QUANTITY"]', d.qty); set('input[aria-label="SPOT CHECK"]', d.spot);
     setProbUI(root, d.probability || '');
+    root.dataset.sample = d.sample ? '1' : '';
     root.querySelectorAll('select.res').forEach(x => {
       const key = (x.getAttribute('aria-label') || '').replace(/ result$/, '');
       // Older records: one 'Material check' result for all materials; renamed items under their old key
@@ -628,7 +661,7 @@ function renderOQC(panel, opts = {}) {
   }
   const pageClone = () => $('oqcForm').cloneNode(true);
   function namedFromSnap(snap) { const t = pageClone(); applySnapshot(t, snap); return readNamed(t); }
-  function snapFromNamed(d) { const t = pageClone(); writeNamed(t, d); return { vals: fields(t).map(c => c.value), prob: d.probability || '' }; }
+  function snapFromNamed(d) { const t = pageClone(); writeNamed(t, d); return { vals: fields(t).map(c => c.value), prob: d.probability || '', sample: !!d.sample }; }
   function pageComplete(snap) { const t = pageClone(); applySnapshot(t, snap); return !missingOn(t).length; }
 
   async function saveRecord(forceId) {
@@ -654,7 +687,7 @@ function renderOQC(panel, opts = {}) {
     const body = {
       shipDate: $('oqcShip').value,
       lot: h.lot, box: rec.box, itemCode: rec.itemCode, partNo: h.partNo, customer: h.customer, checkDate: h.checkDate, qty: h.qty,
-      probability: h.probability, inspector: h.inspector, checkedBy: h.checkedBy,
+      probability: h.probability, type: h.sample ? 'Sample' : formType === 'First Slot' ? 'First Slot' : 'Normal', inspector: h.inspector, checkedBy: h.checkedBy,
       total: totals.includes('NG') ? 'NG' : totals.length && totals.every(t => t === 'OK') ? 'OK' : '',
       complete: pages.every(pageComplete), pages: named
     };
@@ -679,6 +712,8 @@ function renderOQC(panel, opts = {}) {
   async function loadRecord(id) {
     const r = await api('GET', `/api/oqc/records/${id}`);
     pages = r.pages.map(snapFromNamed);
+    formType = (r.pages[0] && r.pages[0].type) || '';
+    setForm();
     cur = 0;
     applySnapshot($('oqcForm'), pages[0]);
     prob = pages[0].prob;

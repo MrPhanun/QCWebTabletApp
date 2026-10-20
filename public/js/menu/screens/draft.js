@@ -16,12 +16,19 @@ function renderDraft(panel) {
       </label>
       <label class="oqc-ship">${T('o.shipFrom')}<input type="date" id="drFrom" aria-label="Shipment Date from"></label>
       <label class="oqc-ship">${T('o.shipTo')}<input type="date" id="drTo" aria-label="Shipment Date to"></label>
+      <select id="drCust" class="cust-filter" aria-label="Filter by Customer"><option value="">${esc(t('cust.all'))}</option></select>
+      <div class="seg type-seg" id="drType" role="group" aria-label="Filter by Type" data-value="">
+        <button type="button" data-type="" aria-pressed="true">${T('type.all')}</button>
+        <button type="button" data-type="Normal" aria-pressed="false">${T('type.normal')}</button>
+        <button type="button" data-type="First Slot" aria-pressed="false">${T('type.firstSlot')}</button>
+        <button type="button" data-type="Sample" aria-pressed="false">${T('type.sample')}</button>
+      </div>
       <button class="btn-primary" id="drSearch" type="button">${ico('search')}${T('b.search')}</button>
       <span class="count" id="drCount"></span>
       <div class="msg" id="drMsg" role="status"></div>
     </div>
     <div class="table-wrap"><table class="data">
-      <thead><tr>${['h.lot', 'h.box', 'h.itemCode', 'h.partNo', 'h.customer', 'h.checkDate', 'h.shipDate', 'h.pages', 'h.status', 'h.total', 'h.lastSaved']
+      <thead><tr>${['h.lot', 'h.box', 'h.itemCode', 'h.partNo', 'h.type', 'h.customer', 'h.checkDate', 'h.shipDate', 'h.shipQty', 'h.pages', 'h.status', 'h.total', 'h.excelStatus', 'h.pdfStatus', 'h.lastSaved']
         .map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
       <tbody id="drBody"></tbody>
     </table></div>`;
@@ -32,25 +39,39 @@ function renderDraft(panel) {
   const s2 = x => esc(String(x ?? ''));
   let list = [], timer = 0;
 
+  // Excel / PDF status: Draft until it is downloaded, then Printed (back to Draft when the record changes)
+  const printPill = on => `<span class="pill ${on ? 'done' : 'draft'}">${esc(t(on ? 'st.printed' : 'st.draft'))}</span>`;
+  const typePill = ty => `<span class="type-badge ${ty === 'First Slot' ? 'first' : ty === 'Sample' ? 'sample' : 'normal'}">${esc(t(ty === 'First Slot' ? 'type.firstSlot' : ty === 'Sample' ? 'type.sample' : 'type.normal'))}</span>`;
   const label = r => `${r.lot}${r.box ? ` / Box ${r.box}` : ''}`;
 
+  // Customer list: every Customer on the saved records (the chosen one stays selected)
+  async function fillCustomers() {
+    try {
+      const names = await api('GET', '/api/oqc/records?customers=1'), sel = $('drCust'), keep = sel.value;
+      sel.innerHTML = `<option value="">${esc(t('cust.all'))}</option>` + names.map(n => `<option value="${s2(n)}">${s2(n)}</option>`).join('');
+      sel.value = names.includes(keep) ? keep : '';
+    } catch { /* the list is only a help: search still works */ }
+  }
   async function search() {
-    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value });
+    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, type: $('drType').dataset.value, customer: $('drCust').value });
     try {
       list = await api('GET', `/api/oqc/records?${qs}`);
       $('drCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
-      const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value;
+      const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drType').dataset.value || $('drCust').value;
       $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}">
           <td class="num">${s2(r.lot)}</td><td>${s2(r.box)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
+          <td>${typePill(r.type)}</td>
           <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(r.checkDate)}</td><td>${s2(r.shipDate)}</td>
+          <td class="num">${r.qty ?? ''}</td>
           <td class="num">${r.pageCount}</td>
           <td><span class="pill ${r.complete ? 'done' : 'draft'}">${esc(t(r.complete ? 'st.complete' : 'st.draft'))}</span></td>
           <td>${r.total ? `<span class="pill ${r.total === 'NG' ? 'ng' : 'ok'}">${r.total}</span>` : ''}</td>
+          <td>${printPill(r.excelPrinted)}</td><td>${printPill(r.pdfPrinted)}</td>
           <td class="meta">${s2(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
           <td><div class="row-actions"><button class="icon-btn" data-open="${r.id}">${ico('folderOpen')}${T('b.open')}</button>${canExcel
             ? `<button class="icon-btn" data-excel="${r.id}">${ico('excel')}${T('b.excel')}</button><button class="icon-btn" data-pdf="${r.id}">${ico('printer')}${T('b.pdf')}</button>` : ''}${can('daily.delete')
             ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
-        </tr>`).join('') || `<tr><td colspan="12" class="empty-row">${esc(t(filtered ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
+        </tr>`).join('') || `<tr><td colspan="16" class="empty-row">${esc(t(filtered ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
     } catch (err) { msg(err.message); }
   }
 
@@ -81,8 +102,9 @@ function renderDraft(panel) {
       try {
         if (!await needComplete(r)) return;
         const full = await api('GET', `/api/oqc/records/${id}`);
-        const file = await printPdf(`OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
+        const file = await downloadFile(`/api/oqc/records/${id}/pdf`, `OQC_${full.lot}${full.box ? '_' + full.box : ''}`, '.pdf', []);
         msg(t('o.excelDone', { file }), 'ok');
+        search();
       } catch (err) { msg(err.message); }
       return;
     }
@@ -91,8 +113,9 @@ function renderDraft(panel) {
       try {
         if (!await needComplete(r)) return;
         const full = await api('GET', `/api/oqc/records/${id}`);
-        const file = await openExcel(`OQC_${full.lot}${full.box ? '_' + full.box : ''}`, full.pages);
+        const file = await downloadFile(`/api/oqc/records/${id}/excel`, `OQC_${full.lot}${full.box ? '_' + full.box : ''}`, '.xlsx', []);
         msg(t('o.excelDone', { file }), 'ok');
+        search();
       } catch (err) { msg(err.message); }
       return;
     }
@@ -109,9 +132,17 @@ function renderDraft(panel) {
 
   $('drSearch').onclick = search;
   $('drQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 300); });
+  $('drType').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('drType').dataset.value = b.dataset.type;
+    $('drType').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    search();
+  });
+  $('drCust').addEventListener('change', search);
   $('drFrom').addEventListener('change', search);
   $('drTo').addEventListener('change', search);
-  langHook = () => search();
+  langHook = () => { fillCustomers(); search(); };
+  fillCustomers();
   search();
   $('drQ').focus();
 }
