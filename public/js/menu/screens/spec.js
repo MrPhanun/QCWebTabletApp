@@ -9,6 +9,7 @@ function renderSpec(panel) {
   // [field, №, Khmer, English] for 1) MATERIAL CHECK
   const MATERIAL = [['wire', '①', 'ខ្សែ', 'Wire'], ['terminal', '②', 'ធឺរមីណល', 'Terminal'], ['housing', '③', 'ហៅស៊ីង', 'Housing'], ['other', '④', 'ផ្សេងៗ', 'Other']];
   const PER_PAGE = 22, MAX_LINES = 200, MAX_PAGES = Math.ceil(MAX_LINES / PER_PAGE);
+  const ROWS_STEP = 11;   // rows visible before the list scrolls inside itself
   let rows = [], editId = 0, mode = '';   // mode: '' (closed) | 'new' | 'edit' | 'copy' | 'view'
   // Cells that are only filled in during an inspection show as greyed blanks
   const na = (attrs = '') => `<td class="na" ${attrs}></td>`;
@@ -94,17 +95,29 @@ function renderSpec(panel) {
           <button class="btn-primary" id="scSave" type="submit">${ico('save')}${T('b.save')}</button>
         </div>
       </div>
+      <div class="spec-type"><span>${T('h.type')}</span>
+        <div class="seg type-seg" id="scType" role="group" aria-label="Type" data-value="Normal">
+          <button type="button" data-type="Normal" aria-pressed="true">${T('type.normal')}</button>
+          <button type="button" data-type="First Slot" aria-pressed="false">${T('type.firstSlot')}</button>
+        </div>
+      </div>
       <div class="spec-pages" id="scPages"></div>
       <div class="spec-add-page"><button class="icon-btn" id="scAddPage" type="button">${ico('filePlus')}${T('b.addPage')}</button></div>
     </form>
     <div class="spec-bar">
       <label class="search">${svg('list')}<input id="scSearch" type="search" ${P('ph.scSearch')} aria-label="Search SPEC"></label>
+      <select id="scCustFilter" class="cust-filter" aria-label="Filter by Customer"><option value="">${esc(t('cust.all'))}</option></select>
+      <div class="seg type-seg" id="scTypeFilter" role="group" aria-label="Filter by Type" data-value="">
+        <button type="button" data-type="" aria-pressed="true">${T('type.all')}</button>
+        <button type="button" data-type="Normal" aria-pressed="false">${T('type.normal')}</button>
+        <button type="button" data-type="First Slot" aria-pressed="false">${T('type.firstSlot')}</button>
+      </div>
       ${canAdd ? `<button class="btn-primary" id="scAdd" type="button">${ico('plus')}${T('b.add')}</button>` : ''}
       <span class="count" id="scCount"></span>
       <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
     </div>
     <div class="table-wrap spec-list"><table class="data">
-      <thead><tr>${['h.customer', 'h.partNo', 'h.wire', 'h.terminal', 'h.housing', 'h.other', 'h.length', 'h.lastUpdated'].map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
+      <thead><tr>${['h.customer', 'h.partNo', 'h.type', 'h.wire', 'h.terminal', 'h.housing', 'h.other', 'h.length', 'h.lastUpdated'].map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
       <tbody id="scBody"></tbody>
     </table></div>`;
 
@@ -116,11 +129,13 @@ function renderSpec(panel) {
     const q = $('scSearch').value.trim().toLowerCase();
     const hit = r => !q || [r.customer, r.partNo, r.wire, r.terminal, r.housing, r.other, ...r.lengths.flatMap(l => [l.position, specText(l)])]
       .some(v => String(v || '').toLowerCase().includes(q));
-    const list = rows.filter(hit);
-    $('scCount').textContent = q ? t('sc.countOf', { n: list.length, total: rows.length }) : t('sc.count', { n: rows.length });
+    const ty = $('scTypeFilter').dataset.value, cu = $('scCustFilter').value;
+    const list = rows.filter(r => hit(r) && (!ty || r.type === ty) && (!cu || r.customer === cu));
+    $('scCount').textContent = q || ty || cu ? t('sc.countOf', { n: list.length, total: rows.length }) : t('sc.count', { n: rows.length });
     $('scBody').innerHTML = list.map(r => `<tr class="${r.id === editId && mode === 'edit' ? 'editing' : r.id === editId && mode === 'copy' ? 'copying' : ''}">
         <td>${s(r.customer)}</td>
         <td>${s(r.partNo)}</td>
+        <td><span class="type-badge ${r.type === 'First Slot' ? 'first' : 'normal'}">${s(t(r.type === 'First Slot' ? 'type.firstSlot' : 'type.normal'))}</span></td>
         ${['wire', 'terminal', 'housing', 'other'].map(k => `<td class="txt" title="${s(r[k])}">${s(r[k])}</td>`).join('')}
         <td class="num">${r.lengths.length}</td>
         <td class="meta">${s(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
@@ -130,7 +145,9 @@ function renderSpec(panel) {
           ${canEdit ? `<button class="icon-btn" data-act="edit" data-id="${r.id}">${ico('pencil')}${T('b.edit')}</button>` : ''}
           ${canAdd ? `<button class="icon-btn" data-act="copy" data-id="${r.id}">${ico('copy')}${T('b.copy')}</button>` : ''}
           ${canDel ? `<button class="icon-btn del" data-act="del" data-id="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
-      </tr>`).join('') || `<tr><td colspan="9" class="empty-row">${esc(t(rows.length ? 'sc.noMatch' : 'sc.none'))}</td></tr>`;
+      </tr>`).join('') || `<tr><td colspan="10" class="empty-row">${esc(t(rows.length ? 'sc.noMatch' : 'sc.none'))}</td></tr>`;
+    // All rows are in the list; it shows about 10 rows and scrolls inside itself for the rest
+    $('scBody').closest('.spec-list').classList.toggle('scrolling', list.length > ROWS_STEP);
   }
 
   // ---- Pages: head = Customer / Part No / material (page 1 fields), lens[LineNo - 1] = { position, spec, specMinus, specPlus }
@@ -207,6 +224,8 @@ function renderSpec(panel) {
     if (r) r.lengths.forEach(l => { lens[l.no - 1] = { position: l.position || '', spec: l.spec || '', specMinus: l.specMinus || '', specPlus: l.specPlus || '' }; });
     drawPages(Math.max(1, Math.ceil(lens.length / PER_PAGE)), head, lens);
     edR = r;
+    setSeg($('scType'), r && r.type === 'First Slot' ? 'First Slot' : 'Normal');
+    $('scType').querySelectorAll('button').forEach(b => b.disabled = m === 'view');
     setEditorTitle();
     $('scSave').hidden = m === 'view' || (m === 'edit' ? !canEdit : !canAdd);
     $('scPrint').hidden = !canExcel;
@@ -229,14 +248,21 @@ function renderSpec(panel) {
   }
   function closeEditor() { mode = ''; editId = 0; $('scForm').hidden = true; $('scPages').innerHTML = ''; drawList(); }
 
+  // Customer filter: every Customer used in the SPEC list (keeps the chosen one if it is still there)
+  function fillCustomers() {
+    const sel = $('scCustFilter'), keep = sel.value;
+    const names = [...new Set(rows.map(r => r.customer).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    sel.innerHTML = `<option value="">${esc(t('cust.all'))}</option>` + names.map(n => `<option value="${s(n)}">${s(n)}</option>`).join('');
+    sel.value = names.includes(keep) ? keep : '';
+  }
   async function load() {
-    try { rows = await api('GET', '/api/spec'); drawList(); }
+    try { rows = await api('GET', '/api/spec'); fillCustomers(); drawList(); }
     catch (e) { msg(e.message); }
   }
 
   // Values on screen (for the editor's Print button)
   function formData() {
-    const h = readHead(), d = { customer: h.customer.trim(), partNo: h.partNo.trim(), lengths: lengthLines() };
+    const h = readHead(), d = { customer: h.customer.trim(), partNo: h.partNo.trim(), type: $('scType').dataset.value, lengths: lengthLines() };
     MATERIAL.forEach(([k]) => d[k] = h[k].trim());
     return d;
   }
@@ -250,13 +276,23 @@ function renderSpec(panel) {
       lengths: lines.filter(l => Math.ceil(l.no / PER_PAGE) === p + 1)
         .map(l => ({ no: l.no - p * PER_PAGE, position: l.position || '', spec: specText(l), samples: [] })) }));
     try {
-      const file = await openExcel(`SPEC_${code || r.partNo || 'new'}`, pages, 'spec');
+      // First Slot -> the "Spec" template (Spec.xlsx); Normal -> the "OQC Data" template (OQC Data.xlsx)
+      const kind = r.type === 'First Slot' ? 'spec' : 'oqc';
+      const file = await openExcel(`${kind === 'spec' ? 'SPEC' : 'OQC'}_${code || r.partNo || 'new'}`, pages, kind);
       msg(t('o.excelDone', { file }), 'ok');
     } catch (err) { msg(err.message); }
   }
   $('scPrint').onclick = () => specExcel(formData(), $('scPart').value.trim());
 
   $('scSearch').addEventListener('input', drawList);
+  // Segmented Type buttons (same look as Normal / Strict on the OQC record)
+  function setSeg(g, v) {
+    g.dataset.value = v;
+    g.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.type === v));
+  }
+  $('scCustFilter').addEventListener('change', drawList);
+  $('scTypeFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setSeg($('scTypeFilter'), b.dataset.type); drawList(); } });
+  $('scType').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSeg($('scType'), b.dataset.type); });
   if (canAdd) $('scAdd').onclick = () => openEditor('new');
   $('scCancel').onclick = () => { closeEditor(); msg(''); };
 
@@ -297,7 +333,7 @@ function renderSpec(panel) {
   };
 
   langHook = () => {
-    drawList(); setEditorTitle();
+    fillCustomers(); drawList(); setEditorTitle();
     if (mode) drawPages(pageCount(), readHead(), readLens());   // redraw the sheets in the new language, keeping what is typed
   };
   load();

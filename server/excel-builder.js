@@ -149,7 +149,7 @@ ${m[3]}`);
 }
 
 // ---- OQC Data Information: values pasted into the template's own cells, nothing else changed ----
-function fillOqcSheet(sheet, d, itemList, ctx) {
+function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
   const items = d.items || {};
   // AT3:AV3 are three small unmerged cells: the date runs across them, a little smaller so that it fits
@@ -160,7 +160,7 @@ function fillOqcSheet(sheet, d, itemList, ctx) {
   // 1) Material check: each material's result, and its text one line per row
   // (records saved before the per-material results have one 'Material check' result for all four)
   for (const [k, ref] of Object.entries(MATERIAL_RESULT)) set(ref, items[materialKey(k)] ?? items['Material check'] ?? '');
-  for (const [k, rows] of Object.entries(MATERIAL_ROWS)) {
+  for (const [k, rows] of textBoxes ? [] : Object.entries(MATERIAL_ROWS)) {
     const lines = String((d.material || {})[k] || '').split(/\r?\n/);
     if (lines.length > rows.length) lines.splice(rows.length - 1, lines.length - rows.length + 1, lines.slice(rows.length - 1).join(' '));
     lines.forEach((line, i) => set(`C${rows[i]}`, line));
@@ -374,6 +374,18 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
       [k, items[materialKey(k)] === '/' ? '/' : (d.material || {})[k] || '']));
     return { ...d, items, material };
   });
+  // First Slot (the Part No's SPEC Type) uses the Spec template (form "First Lot"): same layout, but the material text is in text boxes
+  if (kind === 'oqc' && pages[0].type === 'First Slot') {
+    const buf = await buildSheetWorkbook(TEMPLATES.spec, pages, (sheet, d, drawing, ctx) => {
+      for (const [k, names] of Object.entries(SPEC_TEXTBOX)) {
+        const text = (d.material || {})[k] || '';
+        if (hasShape(drawing, names)) drawing = fillTextBox(drawing, names, text);
+        else sheet = setCell(sheet, MATERIAL[k].split(':')[0], text);
+      }
+      return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing };
+    });
+    return stackPages(buf, pages[0].partNo);
+  }
   const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing }));
   return stackPages(buf, pages[0].partNo);
 }

@@ -44,6 +44,44 @@ function uiDialog({ title, message, ok = t('b.ok'), cancel = t('b.cancel'), tone
     (tone === 'danger' && cancel ? btns[0] : btns[btns.length - 1]).focus();
   });
 }
+// Pick one of several: choices = [{ value, label, sub }]. Resolves the chosen value, or null when cancelled.
+function uiChoose({ title, message, choices, cancel = t('b.cancel'), icon = '🗂️' }) {
+  return new Promise(resolve => {
+    const back = document.activeElement;
+    const scrim = document.createElement('div');
+    scrim.className = 'dlg-scrim';
+    scrim.innerHTML = `<div class="dlg primary dlg-choose" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+        <div class="dlg-ic" aria-hidden="true">${icon}</div>
+        <h2 id="dlgTitle">${esc(title)}</h2>
+        <p>${message}</p>
+        <div class="choose-list">${choices.map((c, i) => `<button type="button" class="choose-item" data-i="${i}"><b>${esc(c.label)}</b>${c.sub ? `<span>${esc(c.sub)}</span>` : ''}</button>`).join('')}</div>
+        <div class="dlg-actions"><button type="button" class="dlg-btn ghost" data-cancel>${esc(cancel)}</button></div>
+      </div>`;
+    document.body.appendChild(scrim);
+    const close = v => {
+      document.removeEventListener('keydown', onKey, true);
+      scrim.classList.remove('show');
+      setTimeout(() => scrim.remove(), 180);
+      if (back && back.focus) back.focus({ preventScroll: true });
+      resolve(v);
+    };
+    const items = [...scrim.querySelectorAll('.choose-item')];
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); close(null); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const i = items.indexOf(document.activeElement);
+        items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    items.forEach(b => b.onclick = () => close(choices[Number(b.dataset.i)].value));
+    scrim.querySelector('[data-cancel]').onclick = () => close(null);
+    scrim.addEventListener('mousedown', e => { if (e.target === scrim) close(null); });
+    requestAnimationFrame(() => scrim.classList.add('show'));
+    items[0].focus();
+  });
+}
 const uiConfirm = opts => uiDialog(opts);
 const uiAlert = opts => uiDialog({ cancel: null, tone: 'info', icon: '⚠️', ...opts });
 
