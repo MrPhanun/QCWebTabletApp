@@ -122,7 +122,7 @@ const STR = {
   'o.lenPos': ['Length № {no}: Length Position', 'ប្រវែង № {no}៖ ទីតាំងប្រវែង'], 'o.lenSample': ['Length № {no}: sample {list}', 'ប្រវែង № {no}៖ គំរូ {list}'],
   'o.badLot': ['Lot № must be a date: DD-MM-YYYY.', 'Lot № ត្រូវតែជាកាលបរិច្ឆេទ៖ ថ្ងៃ-ខែ-ឆ្នាំ។'], 'ph.lotDate': ['DD-MM-YYYY', 'ថ្ងៃ-ខែ-ឆ្នាំ'], 'ph.dateFmt': ['DD-MM-YYYY', 'ថ្ងៃ-ខែ-ឆ្នាំ'], 't.pickDate': ['Pick a date', 'ជ្រើសរើសកាលបរិច្ឆេទ'],
   'o.shipDate': ['Shipment Date', 'ថ្ងៃដឹកជញ្ជូន'], 'o.needShip': ['Pick the Shipment Date to save.', 'សូមជ្រើសរើសថ្ងៃដឹកជញ្ជូន ដើម្បីរក្សាទុក។'],
-  'h.shipQty': ['Shipment Qty', 'ចំនួនដឹកជញ្ជូន'], 'h.excelStatus': ['Excel Status', 'ស្ថានភាព Excel'], 'h.pdfStatus': ['PDF Status', 'ស្ថានភាព PDF'], 'st.printed': ['Printed', 'បានព្រីន'],
+  'h.shipQty': ['Shipment Qty', 'ចំនួនដឹកជញ្ជូន'], 'h.excelStatus': ['Excel Status', 'ស្ថានភាព Excel'], 'h.pdfStatus': ['PDF Status', 'ស្ថានភាព PDF'], 'st.all': ['All', 'ទាំងអស់'], 'st.printed': ['Printed', 'បានព្រីន'],
   'o.chooseSpecT': ['Choose the SPEC', 'ជ្រើសរើស SPEC'], 'o.chooseSpecM': ['Part No {part} has {n} SPECs. Which one does this item need?', 'Part No {part} មាន SPEC {n}។ តើទំនិញនេះត្រូវប្រើមួយណា?'],
   'o.specNotChosen': ['No SPEC chosen for {part}. Scan again or press Enter in Part No to choose.', 'មិនបានជ្រើស SPEC សម្រាប់ {part}។ ស្កេនម្តងទៀត ឬចុច Enter ក្នុង Part No ដើម្បីជ្រើស។'],
   'o.shipFrom': ['Shipment from', 'ថ្ងៃដឹកជញ្ជូនពី'], 'o.shipTo': ['to', 'ដល់'], 'h.shipDate': ['Shipment Date', 'ថ្ងៃដឹកជញ្ជូន'], 'b.pdf': ['PDF', 'PDF'],

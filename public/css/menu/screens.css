@@ -313,3 +313,7 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .choose-item span { font-size: 12.5px; color: var(--ink-soft); }
 .choose-item:hover, .choose-item:focus-visible { outline: 0; border-color: var(--accent-1, #059669); background: #ecfdf5; }
 .choose-item:active { transform: scale(.985); }
+
+.flt-pdf { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.type-seg button[data-v="printed"][aria-pressed="true"] { background: var(--accent-1); color: #fff; }
+.type-seg button[data-v="draft"][aria-pressed="true"] { background: #d97706; color: #fff; }
