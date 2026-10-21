@@ -45,7 +45,7 @@ async function saveSpec(id, r, userId) {
       .input('customer', sql.NVarChar(100), r.customer).input('partNo', sql.NVarChar(100), r.partNo).input('wire', sql.NVarChar(1000), r.wire)
       .input('terminal', sql.NVarChar(1000), r.terminal).input('housing', sql.NVarChar(1000), r.housing)
       .input('other', sql.NVarChar(1000), r.other).input('type', sql.VarChar(20), r.type).input('user', sql.VarChar(80), userId)
-      .query(`IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE PartNo = @partNo AND SysNo <> @id)
+      .query(`IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE PartNo = @partNo AND Wire = @wire AND Terminal = @terminal AND Housing = @housing AND Other = @other AND SysNo <> @id)
           SELECT CAST(1 AS bit) AS dup, 0 AS rc, NULL AS newId
         ELSE IF @id = 0 BEGIN
           INSERT INTO MstSpec (Customer, PartNo, [Type], Wire, Terminal, Housing, Other, RegBy, UpdateBy)
@@ -96,7 +96,7 @@ async function handleSpec(req, res, session, id) {
       const r = validateSpec(body);
       if (r.error) return sendJson(res, 400, r);
       const out = await saveSpec(id || 0, r, session.id);
-      if (out.dup) return sendJson(res, 409, { error: `Part No ${r.partNo} already exists` });
+      if (out.dup) return sendJson(res, 409, { error: `Part No ${r.partNo} already has a SPEC with the same Wire, Terminal, Housing and Other` });
       if (!out.rc) return sendJson(res, 404, { error: 'This item no longer exists' });
       return sendJson(res, id ? 200 : 201, { id: out.newId });
     }

@@ -57,7 +57,7 @@ const STR = {
   'd.noPrintM': ['The print template did not load. Refresh the page and try again.', 'គំរូបោះពុម្ពមិនបានផ្ទុកទេ។ សូមផ្ទុកទំព័រឡើងវិញ ហើយសាកល្បងម្តងទៀត។'],
   // table headers / fields
   'h.customer': ['Customer', 'អតិថិជន'], 'h.itemCode': ['Item Code', 'លេខកូដទំនិញ'], 'h.partNo': ['Part No', 'Part No'],
-  'h.type': ['Type', 'ប្រភេទ'], 'see.more': ['See more ({n})', 'មើលបន្ថែម ({n})'], 'see.less': ['See less', 'បង្រួម'], 'cust.all': ['All Customers', 'គ្រប់អតិថិជន'], 'type.all': ['All Types', 'គ្រប់ប្រភេទ'], 'type.sample': ['Sample', 'Sample'], 'type.normal': ['Normal', 'Normal'], 'type.firstSlot': ['First Slot', 'First Slot'],
+  'h.type': ['Type', 'ប្រភេទ'], 'see.more': ['See more ({n})', 'មើលបន្ថែម ({n})'], 'see.less': ['See less', 'បង្រួម'], 'cust.all': ['All Customers', 'គ្រប់អតិថិជន'], 'type.all': ['All Types', 'គ្រប់ប្រភេទ'], 'type.sample': ['Sample', 'Sample'], 'type.normal': ['Normal', 'Normal'], 'type.firstSlot': ['First Lot', 'First Lot'],
   'h.wire': ['Wire', 'ខ្សែ'], 'h.terminal': ['Terminal', 'ធឺរមីណល'], 'h.housing': ['Housing', 'ហៅស៊ីង'], 'h.other': ['Other', 'ផ្សេងៗ'],
   'h.length': ['Length', 'ប្រវែង'], 'h.lastUpdated': ['Last updated', 'កែប្រែចុងក្រោយ'], 'h.lot': ['Lot №', 'Lot №'], 'h.box': ['Box', 'Box'],
   'h.checkDate': ['Check date', 'ថ្ងៃត្រួតពិនិត្យ'], 'h.pages': ['Pages', 'ទំព័រ'], 'h.status': ['Status', 'ស្ថានភាព'], 'h.total': ['Total', 'សរុប'],
@@ -93,7 +93,7 @@ const STR = {
   // OQC Data Information
   'ph.scan': ['Scan label barcode', 'ស្កេនបាកូដ'], 'ph.badge': ['Scan badge or type', 'ស្កេនកាត ឬវាយបញ្ចូល'],
   'ph.find': ['Search Lot, Box, Item Code, Part No, Customer, Inspector…', 'ស្វែងរក Lot, Box, លេខកូដទំនិញ, Part No, អតិថិជន, អ្នកត្រួតពិនិត្យ…'],
-  'pg': ['Page {n} / {total}', 'ទំព័រ {n} / {total}'], 'st.complete': ['Complete', 'រួចរាល់'], 'st.draft': ['Draft', 'ព្រាង'],
+  'pg': ['Page {n} / {total}', 'ទំព័រ {n} / {total}'], 'st.complete': ['Can Print', 'អាចបោះពុម្ពបាន'], 'st.draft': ['Draft', 'ព្រាង'],
   'rec.count': ['{n} record{s}', '{n} កំណត់ត្រា'], 'rec.noMatch': ['No saved records match', 'រកមិនឃើញកំណត់ត្រាដែលត្រូវគ្នាទេ'],
   'rec.none': ['No saved records yet', 'មិនទាន់មានកំណត់ត្រាដែលបានរក្សាទុកទេ'],
   'st.new': ['New', 'ថ្មី'], 'st.newUnsaved': ['New · not saved', 'ថ្មី · មិនទាន់រក្សាទុក'], 'st.saved': ['Saved #{id}', 'បានរក្សាទុក #{id}'],
@@ -192,7 +192,7 @@ const SERVER_KM = [
   [/^No SPEC for Part No (.+?) — .*$/, 'គ្មាន SPEC សម្រាប់ Part No $1 — សូមបន្ថែមនៅ ទិន្នន័យមេ › SPEC'],
   [/^Not a valid label barcode$/, 'មិនមែនជាបាកូដស្លាកត្រឹមត្រូវទេ'], [/^Not a valid staff ID$/, 'ID បុគ្គលិកមិនត្រឹមត្រូវ'],
   [/^No user with ID (.+)$/, 'រកមិនឃើញអ្នកប្រើដែលមាន ID $1'],
-  [/^Part No (.+) already exists$/, 'Part No $1 មានរួចហើយ'],
+  [/^Part No (.+) already has a SPEC with the same Wire, Terminal, Housing and Other$/, 'Part No $1 មាន SPEC ដែលមាន Wire, Terminal, Housing និង Other ដូចគ្នារួចហើយ'],
   [/^Part No is required$/, 'ត្រូវការ Part No'], [/^Give a Part No$/, 'សូមបញ្ចូល Part No'],
   [/^No (Normal|Strict) range covers (\d+)$/, 'គ្មានជួរ $1 ដែលគ្របដណ្តប់ $2 ទេ'],
   [/^Overlaps the existing (\w+) range (.+)$/, 'ជាន់គ្នាជាមួយជួរ $1 ដែលមានស្រាប់ $2'],

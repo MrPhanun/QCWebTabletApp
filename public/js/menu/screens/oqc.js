@@ -363,20 +363,22 @@ function renderOQC(panel, opts = {}) {
     $('oqcForm').dataset.form = formType === 'First Slot' ? 'first' : 'normal';
   }
   let lastPart = '';
-  async function lookupPart() {
+  async function lookupPart(specId = 0) {
+    if (!Number.isInteger(specId)) specId = 0;   // called as an event handler: the argument is the Event
     const part = $('oqcPart').value.trim();
-    if (!part || part === lastPart) return;
+    if (!part || (part === lastPart && !specId)) return;
     lastPart = part;
     try {
-      const r = await api('GET', `/api/oqc/spec?partNo=${encodeURIComponent(part)}`);
+      const r = await api('GET', `/api/oqc/spec?partNo=${encodeURIComponent(part)}${specId ? '&specId=' + specId : ''}`);
       if ($('oqcPart').value.trim() !== part) return;   // typed something else meanwhile
       if (r.choices) {   // the Part No has more than one SPEC: choose which one this item needs
         const pick = await uiChoose({ title: t('o.chooseSpecT'), message: esc(t('o.chooseSpecM', { part, n: r.choices.length })),
-          choices: r.choices.map(c => ({ value: c.partNo, label: c.partNo, sub: [c.customer, c.type === 'First Slot' ? t('type.firstSlot') : ''].filter(Boolean).join(' · ') })) });
+          choices: r.choices.map(c => ({ value: String(c.id), label: c.partNo, sub: [c.customer, c.type === 'First Slot' ? t('type.firstSlot') : ''].filter(Boolean).join(' · '),
+            rows: [['ខ្សែ', 'Wire', c.wire], ['ធឺរមីណល', 'Terminal', c.terminal], ['ហៅស៊ីង', 'Housing', c.housing], ['ផ្សេងៗ', 'Other', c.other]]
+              .map(([km, en, v]) => [`${km} <small>${en}</small>`, v]) })) });
         lastPart = '';
         if (!pick) return msg(t('o.specNotChosen', { part }));
-        $('oqcPart').value = pick;
-        return lookupPart();
+        return lookupPart(Number(pick));
       }
       if (r.partNo && r.partNo !== part) { $('oqcPart').value = r.partNo; lastPart = r.partNo; }
       if (r.customer) $('oqcCustomer').value = r.customer;
@@ -514,13 +516,18 @@ function renderOQC(panel, opts = {}) {
   showPages();
   panel.querySelectorAll('.oqc-len').forEach(markLength);   // blank rows without SPEC from the start
 
-  // ---- Before printing, every page must be complete (Remarks and the material text are optional)
+  // ---- Before printing, every page must be complete (Remarks is optional; material text needs text unless its result is "/")
   const CIRCLED = ['①', '②', '③', '④', '⑤'];
   function missingOn(root) {
     const miss = [];
     const need = (el, label) => { if (el && !String(el.value || '').trim()) miss.push({ el, label }); };
     need(root.querySelector('input[type="date"]'), fieldName('Check date'));
     ['CUSTOMER', 'PART №', 'LOT №', 'QUANTITY', 'SPOT CHECK'].forEach(a => need(root.querySelector(`input[aria-label="${a}"]`), fieldName(a)));
+    // Material text can't be blank, unless its result is "/" (not used: the box shows the diagonal line)
+    root.querySelectorAll('textarea[aria-label^="Material "]').forEach(ta => {
+      if (ta.closest('tr').querySelector('select.mat-res')?.value === '/') return;
+      need(ta, fieldName(ta.getAttribute('aria-label')));
+    });
     if (!root.querySelector('.oqc-prob button[aria-pressed="true"]')) miss.push({ el: root.querySelector('.oqc-prob'), label: fieldName('Probability') });
     root.querySelectorAll('select.res').forEach(sel => {
       if (sel.closest('.oqc-len') || sel.getAttribute('aria-label') === 'Total determination') return;

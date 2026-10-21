@@ -161,17 +161,21 @@ async function handleOqcRecords(req, res, session, id) {
 // GET /api/oqc/spec?partNo=FM4-H915-000
 async function handleOqcSpec(req, res, session) {
   if (!session) return sendJson(res, 401, { error: 'Not logged in' });
-  const partNo = String(new URL(req.url, 'http://x').searchParams.get('partNo') || '').trim();
+  const q = new URL(req.url, 'http://x').searchParams;
+  const partNo = String(q.get('partNo') || '').trim();
+  const specId = Number.parseInt(q.get('specId'), 10) || 0;
   if (!partNo || partNo.length > 100) return sendJson(res, 400, { error: 'Give a Part No' });
   try {
     const pool = await getPool();
     // The label's Part No (e.g. FM4-H915-000) matches the SPEC of that Part No and its numbered versions (FM4-H915-000(001), (002), ...)
     const like = partNo.replace(/[\\%_[]/g, c => '\\' + c) + '(%';
-    const found = (await pool.request().input('part', sql.NVarChar(100), partNo).input('like', sql.NVarChar(210), like).query(
+    const found = (await pool.request().input('part', sql.NVarChar(100), partNo).input('like', sql.NVarChar(210), like)
+      .input('specId', sql.Int, specId).query(
       `SELECT SysNo AS id, Customer AS customer, PartNo AS partNo, [Type] AS type, Wire AS wire, Terminal AS terminal, Housing AS housing, Other AS other
-       FROM MstSpec WHERE PartNo = @part OR PartNo LIKE @like ESCAPE '\\' ORDER BY PartNo`)).recordset;
+       FROM MstSpec WHERE (PartNo = @part OR PartNo LIKE @like ESCAPE '\\') AND (@specId = 0 OR SysNo = @specId) ORDER BY PartNo, SysNo`)).recordset;
     // More than one SPEC: the user chooses which one this item needs
-    if (found.length > 1) return sendJson(res, 200, { choices: found.map(x => ({ partNo: x.partNo, customer: x.customer, type: x.type })) });
+    if (found.length > 1) return sendJson(res, 200, { choices: found.map(x => ({ id: x.id, partNo: x.partNo, customer: x.customer, type: x.type,
+      wire: x.wire, terminal: x.terminal, housing: x.housing, other: x.other })) });
     const spec = found[0];
     if (!spec) return sendJson(res, 404, { error: `No SPEC for Part No ${partNo} — add it in Master Data › SPEC` });
     // Length Check rows of the SPEC: № on the record = LineNo
