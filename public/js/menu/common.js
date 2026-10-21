@@ -44,7 +44,7 @@ function uiDialog({ title, message, ok = t('b.ok'), cancel = t('b.cancel'), tone
     (tone === 'danger' && cancel ? btns[0] : btns[btns.length - 1]).focus();
   });
 }
-// Pick one of several: choices = [{ value, label, sub }]. Resolves the chosen value, or null when cancelled.
+// Pick one of several: choices = [{ value, label, sub, rows: [[labelHtml, value]] }]. Resolves the chosen value, or null when cancelled.
 function uiChoose({ title, message, choices, cancel = t('b.cancel'), icon = '🗂️' }) {
   return new Promise(resolve => {
     const back = document.activeElement;
@@ -54,7 +54,7 @@ function uiChoose({ title, message, choices, cancel = t('b.cancel'), icon = '�
         <div class="dlg-ic" aria-hidden="true">${icon}</div>
         <h2 id="dlgTitle">${esc(title)}</h2>
         <p>${message}</p>
-        <div class="choose-list">${choices.map((c, i) => `<button type="button" class="choose-item" data-i="${i}"><b>${esc(c.label)}</b>${c.sub ? `<span>${esc(c.sub)}</span>` : ''}</button>`).join('')}</div>
+        <div class="choose-list">${choices.map((c, i) => `<button type="button" class="choose-item" data-i="${i}"><b>${esc(c.label)}</b>${c.sub ? `<span>${esc(c.sub)}</span>` : ''}${c.rows ? `<dl>${c.rows.map(([k, v]) => `<dt>${k}</dt><dd>${v ? esc(v) : '<i>-</i>'}</dd>`).join('')}</dl>` : ''}</button>`).join('')}</div>
         <div class="dlg-actions"><button type="button" class="dlg-btn ghost" data-cancel>${esc(cancel)}</button></div>
       </div>`;
     document.body.appendChild(scrim);

@@ -363,20 +363,22 @@ function renderOQC(panel, opts = {}) {
     $('oqcForm').dataset.form = formType === 'First Slot' ? 'first' : 'normal';
   }
   let lastPart = '';
-  async function lookupPart() {
+  async function lookupPart(specId = 0) {
+    if (!Number.isInteger(specId)) specId = 0;   // called as an event handler: the argument is the Event
     const part = $('oqcPart').value.trim();
-    if (!part || part === lastPart) return;
+    if (!part || (part === lastPart && !specId)) return;
     lastPart = part;
     try {
-      const r = await api('GET', `/api/oqc/spec?partNo=${encodeURIComponent(part)}`);
+      const r = await api('GET', `/api/oqc/spec?partNo=${encodeURIComponent(part)}${specId ? '&specId=' + specId : ''}`);
       if ($('oqcPart').value.trim() !== part) return;   // typed something else meanwhile
       if (r.choices) {   // the Part No has more than one SPEC: choose which one this item needs
         const pick = await uiChoose({ title: t('o.chooseSpecT'), message: esc(t('o.chooseSpecM', { part, n: r.choices.length })),
-          choices: r.choices.map(c => ({ value: c.partNo, label: c.partNo, sub: [c.customer, c.type === 'First Slot' ? t('type.firstSlot') : ''].filter(Boolean).join(' · ') })) });
+          choices: r.choices.map(c => ({ value: String(c.id), label: c.partNo, sub: [c.customer, c.type === 'First Slot' ? t('type.firstSlot') : ''].filter(Boolean).join(' · '),
+            rows: [['ខ្សែ', 'Wire', c.wire], ['ធឺរមីណល', 'Terminal', c.terminal], ['ហៅស៊ីង', 'Housing', c.housing], ['ផ្សេងៗ', 'Other', c.other]]
+              .map(([km, en, v]) => [`${km} <small>${en}</small>`, v]) })) });
         lastPart = '';
         if (!pick) return msg(t('o.specNotChosen', { part }));
-        $('oqcPart').value = pick;
-        return lookupPart();
+        return lookupPart(Number(pick));
       }
       if (r.partNo && r.partNo !== part) { $('oqcPart').value = r.partNo; lastPart = r.partNo; }
       if (r.customer) $('oqcCustomer').value = r.customer;

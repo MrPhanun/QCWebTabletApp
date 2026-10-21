@@ -305,12 +305,17 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .type-seg button[data-type="Sample"][aria-pressed="true"] { background: #2563eb; color: #fff; }
 
 /* Choose-one dialog (several SPECs for one Part No) */
-.dlg-choose { max-width: 440px; }
+.dlg-choose { max-width: 540px; }
 .choose-list { display: grid; gap: 8px; max-height: 42vh; overflow-y: auto; margin: 4px 0 12px; text-align: left; }
-.choose-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.85);
+.choose-item { display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 2px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.85);
   font: inherit; cursor: pointer; transition: border-color .2s ease, background-color .2s ease, transform .15s ease; }
 .choose-item b { font-size: 14.5px; font-weight: 700; color: var(--ink); }
-.choose-item span { font-size: 12.5px; color: var(--ink-soft); }
+.choose-item span { font-size: 12.5px; color: var(--ink-soft); white-space: pre-line; text-align: left; }
+.choose-item dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line); }
+.choose-item dt { text-align: left; font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.choose-item dt small { font-weight: 600; color: var(--ink-soft); }
+.choose-item dd { margin: 0; font-size: 12.5px; color: var(--ink-soft); text-align: left; overflow-wrap: anywhere; }
+.choose-item dd i { color: var(--line); font-style: normal; }
 .choose-item:hover, .choose-item:focus-visible { outline: 0; border-color: var(--accent-1, #059669); background: #ecfdf5; }
 .choose-item:active { transform: scale(.985); }
 
