@@ -293,7 +293,7 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .see-count { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
 /* Expanded SPEC list: a fixed-height window of about 10 rows that scrolls inside, header stays on top */
-.spec-list.scrolling { max-height: 620px; overflow-y: auto; scroll-behavior: smooth; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(5,150,105,.35) transparent; }
+.spec-list.scrolling { max-height: 410px; overflow-y: auto; scroll-behavior: smooth; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(5,150,105,.35) transparent; }
 .spec-list.scrolling table.data thead th { position: sticky; top: 0; z-index: 2; background: #ecf9f2; box-shadow: 0 1px 0 var(--line); }
 
 /* Sample tickbox in the OQC sheet header: ticked = only samples ①②③, ④⑤ are "/" */

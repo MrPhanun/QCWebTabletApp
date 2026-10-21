@@ -9,7 +9,7 @@ function renderSpec(panel) {
   // [field, №, Khmer, English] for 1) MATERIAL CHECK
   const MATERIAL = [['wire', '①', 'ខ្សែ', 'Wire'], ['terminal', '②', 'ធឺរមីណល', 'Terminal'], ['housing', '③', 'ហៅស៊ីង', 'Housing'], ['other', '④', 'ផ្សេងៗ', 'Other']];
   const PER_PAGE = 22, MAX_LINES = 200, MAX_PAGES = Math.ceil(MAX_LINES / PER_PAGE);
-  const ROWS_STEP = 11;   // rows visible before the list scrolls inside itself
+  const ROWS_STEP = 7;    // rows visible before the list scrolls inside itself
   let rows = [], editId = 0, mode = '';   // mode: '' (closed) | 'new' | 'edit' | 'copy' | 'view'
   // Cells that are only filled in during an inspection show as greyed blanks
   const na = (attrs = '') => `<td class="na" ${attrs}></td>`;
@@ -146,7 +146,7 @@ function renderSpec(panel) {
           ${canAdd ? `<button class="icon-btn" data-act="copy" data-id="${r.id}">${ico('copy')}${T('b.copy')}</button>` : ''}
           ${canDel ? `<button class="icon-btn del" data-act="del" data-id="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
       </tr>`).join('') || `<tr><td colspan="10" class="empty-row">${esc(t(rows.length ? 'sc.noMatch' : 'sc.none'))}</td></tr>`;
-    // All rows are in the list; it shows about 10 rows and scrolls inside itself for the rest
+    // All rows are in the list; it shows 7 rows and scrolls inside itself for the rest
     $('scBody').closest('.spec-list').classList.toggle('scrolling', list.length > ROWS_STEP);
   }
 
