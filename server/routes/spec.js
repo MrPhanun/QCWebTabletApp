@@ -46,8 +46,8 @@ async function saveSpec(id, r, userId) {
       .input('terminal', sql.NVarChar(1000), r.terminal).input('housing', sql.NVarChar(1000), r.housing)
       .input('other', sql.NVarChar(1000), r.other).input('type', sql.VarChar(20), r.type).input('user', sql.VarChar(80), userId)
       .query(`-- A Part No that already has an OQC record (Search Draft / Save) is no longer First Slot
-      IF @type = 'First Slot' AND EXISTS (SELECT 1 FROM OqcRecord WHERE PartNo = @partNo) SET @type = 'Normal';
-      IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE PartNo = @partNo AND Wire = @wire AND Terminal = @terminal AND Housing = @housing AND Other = @other AND SysNo <> @id)
+      IF @type = 'First Slot' AND EXISTS (SELECT 1 FROM OqcRecord WHERE PartNo = @partNo AND DelStatus = 'Active') SET @type = 'Normal';
+      IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE DelStatus = 'Active' AND PartNo = @partNo AND Wire = @wire AND Terminal = @terminal AND Housing = @housing AND Other = @other AND SysNo <> @id)
           SELECT CAST(1 AS bit) AS dup, 0 AS rc, NULL AS newId
         ELSE IF @id = 0 BEGIN
           INSERT INTO MstSpec (Customer, PartNo, [Type], Wire, Terminal, Housing, Other, RegBy, UpdateBy)
@@ -55,7 +55,7 @@ async function saveSpec(id, r, userId) {
           SELECT CAST(0 AS bit) AS dup, @@ROWCOUNT AS rc, CAST(SCOPE_IDENTITY() AS int) AS newId
         END ELSE BEGIN
           UPDATE MstSpec SET Customer=@customer, PartNo=@partNo, [Type]=@type, Wire=@wire, Terminal=@terminal, Housing=@housing, Other=@other,
-            UpdateBy=@user, UpdateDate=GETDATE() WHERE SysNo=@id;
+            UpdateBy=@user, UpdateDate=GETDATE() WHERE SysNo=@id AND DelStatus='Active';
           SELECT CAST(0 AS bit) AS dup, @@ROWCOUNT AS rc, @id AS newId
         END`);
     const out = head.recordset[0];
@@ -81,13 +81,14 @@ async function handleSpec(req, res, session, id) {
   try {
     const pool = await getPool();
     if (!id && req.method === 'GET') {
-      const heads = await pool.request().query(
+      const status = new URL(req.url, 'http://x').searchParams.get('status') === 'deleted' ? 'Deleted' : 'Active';
+      const heads = await pool.request().input('status', sql.VarChar(10), status).query(
         `SELECT SysNo AS id, Customer AS customer, PartNo AS partNo, [Type] AS type, Wire AS wire, Terminal AS terminal, Housing AS housing, Other AS other,
                 UpdateBy AS updateBy, UpdateDate AS updateDate
-         FROM MstSpec ORDER BY PartNo`);
-      const lines = await pool.request().query(
-        `SELECT SpecNo AS specNo, [LineNo] AS no, Position AS position, Spec AS spec, SpecMinus AS specMinus, SpecPlus AS specPlus,
-                [Range] AS range FROM MstSpecLength ORDER BY SpecNo, [LineNo]`);
+         FROM MstSpec WHERE DelStatus = @status ORDER BY PartNo`);
+      const lines = await pool.request().input('status', sql.VarChar(10), status).query(
+        `SELECT l.SpecNo AS specNo, l.[LineNo] AS no, l.Position AS position, l.Spec AS spec, l.SpecMinus AS specMinus, l.SpecPlus AS specPlus,
+                l.[Range] AS range FROM MstSpecLength l JOIN MstSpec s ON s.SysNo = l.SpecNo WHERE s.DelStatus = @status ORDER BY l.SpecNo, l.[LineNo]`);
       const byId = new Map(heads.recordset.map(h => [h.id, { ...h, lengths: [] }]));
       for (const l of lines.recordset) byId.get(l.specNo)?.lengths.push({ no: l.no, position: l.position, spec: l.spec, specMinus: l.specMinus, specPlus: l.specPlus, range: l.range });
       return sendJson(res, 200, [...byId.values()]);
@@ -103,7 +104,9 @@ async function handleSpec(req, res, session, id) {
       return sendJson(res, id ? 200 : 201, { id: out.newId });
     }
     if (req.method === 'DELETE' && id) {
-      const { rowsAffected } = await pool.request().input('id', sql.Int, id).query('DELETE FROM MstSpec WHERE SysNo = @id');
+      // Soft delete: the row and its length lines stay, only DelStatus changes
+      const { rowsAffected } = await pool.request().input('id', sql.Int, id).input('user', sql.VarChar(80), session.id)
+        .query("UPDATE MstSpec SET DelStatus = 'Deleted', UpdateBy = @user, UpdateDate = GETDATE() WHERE SysNo = @id AND DelStatus = 'Active'");
       return rowsAffected[0] ? sendJson(res, 200, { ok: true }) : sendJson(res, 404, { error: 'This item no longer exists' });
     }
     sendJson(res, 405, { error: 'Method not allowed' });

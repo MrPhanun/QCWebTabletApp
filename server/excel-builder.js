@@ -21,6 +21,8 @@ const ITEM_ROWS = [9, 11, 13, 15, 17, 19, 21, 23, 25];   // 3) INSPECTION POINT 
 // 1) MATERIAL CHECK: text area under each label (left of the Result column) and that material's Result cell
 const MATERIAL = { wire: 'C10:AB12', terminal: 'C14:AB17', housing: 'C19:AB22', other: 'C24:AB26' };
 const MATERIAL_RESULT = { wire: 'AC9', terminal: 'AC13', housing: 'AC18', other: 'AC23' };
+// The merged Result box of each material (a material that is not used gets a line over it too)
+const MATERIAL_RESULT_BOX = { wire: 'AC9:AE12', terminal: 'AC13:AE17', housing: 'AC18:AE22', other: 'AC23:AE26' };
 // OQC: the material text goes one line per row of its area, in column C
 const MATERIAL_ROWS = { wire: [10, 11, 12], terminal: [14, 15, 16, 17], housing: [19, 20, 21, 22], other: [24, 25, 26] };
 // Saved result key of one material (the page's "Material Wire result" select, ...)
@@ -159,7 +161,8 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   set('AB7', asNum(d.qty)); set('AI7', asNum(d.spot)); set('AP7', d.probability);
   // 1) Material check: each material's result, and its text one line per row
   // (records saved before the per-material results have one 'Material check' result for all four)
-  for (const [k, ref] of Object.entries(MATERIAL_RESULT)) set(ref, items[materialKey(k)] ?? items['Material check'] ?? '');
+  // (a material that is not used ("/") has no result text: a line is drawn over its Result box instead)
+  for (const [k, ref] of Object.entries(MATERIAL_RESULT)) set(ref, String((d.material || {})[k] || '') === '/' ? '' : items[materialKey(k)] ?? items['Material check'] ?? '');
   for (const [k, rows] of Object.entries(MATERIAL_ROWS)) {
     // Not used ("/"): no text, a line shape is drawn over the box instead (see addMaterialLines)
     if (String((d.material || {})[k] || '') === '/') continue;
@@ -177,7 +180,7 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     if (!r) return;
     sheet = addMerge(sheet, `AT${r}:AV${r + 1}`);
     if (styleOf(sheet, `AT${r}`) === '18') sheet = useStyle(sheet, `AT${r}`, centered);
-    set(`AT${r}`, items[en] || '');
+    set(`AT${r}`, items[en] === '/' ? '' : items[en] || '');   // "/" (not used): a line is drawn over the box instead (see addMaterialLines)
   });
   // 2) Length check: № 1-11 on the left table, 12-22 on the right
   const byNo = new Map((d.lengths || []).map(l => [Number(l.no), l]));
@@ -194,20 +197,16 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     for (let i = 0; i < ROWS; i++) {
       const l = byNo.get(t * ROWS + i + 1);
       const r = FIRST_LEN_ROW + i;
-      side.samples.forEach(([c1, c2], k) => { if (!(slash && k >= 3)) centerBox(c1, c2, r); });
+      side.samples.forEach(([c1, c2]) => centerBox(c1, c2, r));
       if (!l) continue;
       set(`${side.pos[0]}${r}`, exactNum(l.position));
       sheet = setSpec(sheet, side, r, l.spec, ctx);
       side.samples.forEach(([c1], k) => set(`${c1}${r}`, exactNum((l.samples || [])[k])));
     }
-    if (slash) {
-      const c1 = side.samples[3][0], c2 = side.samples[4][1];
-      sheet = addMerge(sheet, `${c1}${FIRST_LEN_ROW}:${c2}${FIRST_LEN_ROW + ROWS - 1}`);
-      sheet = useStyle(sheet, `${c1}${FIRST_LEN_ROW}`, diagonalStyle(ctx, styleOf(sheet, `${c1}${FIRST_LEN_ROW}`)));
-    }
+    // ④⑤ "/": the columns and rows stay as they are; the line is a shape over them (see addMaterialLines)
     // Result row: one result under each sample ① .. ⑤ (records saved before that have one result for the whole table)
     side.samples.forEach(([c1, c2]) => centerBox(c1, c2, RESULT_ROW));
-    if (Array.isArray(res)) side.samples.forEach(([c1], k) => set(`${c1}${RESULT_ROW}`, res[k] || ''));
+    if (Array.isArray(res)) side.samples.forEach(([c1], k) => set(`${c1}${RESULT_ROW}`, slash && k >= 3 ? '' : res[k] || ''));   // ④⑤ "/": the line crosses the Result row instead of a "/" text
     else set(`${side.samples[0][0]}${RESULT_ROW}`, res);
   });
   // Footer: remarks, total determination, checked by, inspector
@@ -221,18 +220,17 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
 
 // A material that is not used ("/"): one straight line shape over its whole text area, bottom-left to top-right.
 // Added to the sheet's drawing (anchored to the cells, so it follows the rows when pages are stacked).
-function addMaterialLines(drawing, d) {
+function addMaterialLines(drawing, d, itemList = []) {
   const anchors = [];
   Object.entries(MATERIAL).forEach(([k, range], i) => {
     if (String((d.material || {})[k] || '') !== '/') return;
+    // A thin black line over the material's Result box too
+    drawing = showRedLine(drawing, anchors, k[0].toUpperCase() + k.slice(1) + 'ResultLine', 910 + i, `Not used ${k} result`, MATERIAL_RESULT_BOX[k]);
     // The template (Spec.xlsx) has its own hidden line shape per material ("TerminalLine", ...): it is made visible
     const own = [k[0].toUpperCase() + k.slice(1) + 'Line'];
     if (hasShape(drawing, own)) {
-      // ... and stretched over the material's whole text area, corner to corner
-      const [, c1, r1, c2, r2] = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-      const box = `<xdr:from><xdr:col>${colNum(c1) - 1}</xdr:col><xdr:colOff>9525</xdr:colOff><xdr:row>${+r1 - 1}</xdr:row><xdr:rowOff>9525</xdr:rowOff></xdr:from><xdr:to><xdr:col>${colNum(c2)}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${+r2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>`;
-      drawing = drawing.replace(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g,
-        a => hasShape(a, own) ? unhide(a).replace(/<xdr:from>[\s\S]*?<\/xdr:to>/, box) : a);
+      // ... where the template placed it (the template decides the line's size and position)
+      drawing = drawing.replace(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g, a => hasShape(a, own) ? unhide(a) : a);
       return;
     }
     const [, c1, r1, c2, r2] = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
@@ -242,7 +240,38 @@ function addMaterialLines(drawing, d) {
       + `<xdr:spPr><a:xfrm flipV="1"><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom>`
       + `<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln></xdr:spPr></xdr:cxnSp><xdr:clientData/></xdr:twoCellAnchor>`);
   });
+  // 3) Inspection point not used ("/"): a thin line over its Result box
+  itemList.forEach(([, en], i) => {
+    if (ITEM_ROWS[i] && (d.items || {})[en] === '/') anchors.push(redLine(930 + i, `Not used item ${i + 1}`, `AT${ITEM_ROWS[i]}:AV${ITEM_ROWS[i] + 1}`));
+  });
+  // Length Check ④⑤ not used ("/" results): one thin black line over the whole ④⑤ block (no thin diagonal under it)
+  [LEFT, RIGHT].forEach((side, t) => {
+    const res = (d.lengthResults || [])[t];
+    if (!(Array.isArray(res) && res[3] === '/' && res[4] === '/')) return;
+    drawing = showRedLine(drawing, anchors, `LengthLine${t + 1}`, 920 + t, `Not used length ${t + 1}`, `${side.samples[3][0]}${FIRST_LEN_ROW}:${side.samples[4][1]}${RESULT_ROW}`);
+  });
   return anchors.length ? drawing.replace('</xdr:wsDr>', anchors.join('') + '</xdr:wsDr>') : drawing;
+}
+// The template carries a hidden red line per place (named like "WireResultLine", "LengthLine1"): it is made visible; a template
+// without it gets a new line shape (pushed to anchors)
+const THIN_BLACK = '<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>';   // the one line style for "not used" lines
+function showRedLine(drawing, anchors, own, id, name, range) {
+  if (!hasShape(drawing, [own])) { anchors.push(redLine(id, name, range)); return drawing; }
+  // ... stretched over the range, corner to corner
+  const [, c1, r1, c2, r2] = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  const pt = (c, r) => `<xdr:col>${c}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${r}</xdr:row><xdr:rowOff>0</xdr:rowOff>`;
+  const box = `<xdr:from>${pt(colNum(c1) - 1, +r1 - 1)}</xdr:from><xdr:to>${pt(colNum(c2), +r2)}</xdr:to>`;
+  return drawing.replace(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g,
+    a => hasShape(a, [own]) ? unhide(a).replace(/<a:ln\b[\s\S]*?<\/a:ln>/, THIN_BLACK).replace(/<xdr:from>[\s\S]*?<\/xdr:to>/, box) : a);
+}
+// A thin black line shape from the bottom-left to the top-right corner of a cell range ("AC9:AE12"), anchored to the cells
+function redLine(id, name, range) {
+  const [, c1, r1, c2, r2] = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  const pt = (c, r) => `<xdr:col>${c}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${r}</xdr:row><xdr:rowOff>0</xdr:rowOff>`;
+  return `<xdr:twoCellAnchor><xdr:from>${pt(colNum(c1) - 1, +r1 - 1)}</xdr:from><xdr:to>${pt(colNum(c2), +r2)}</xdr:to>`
+    + `<xdr:cxnSp macro=""><xdr:nvCxnSpPr><xdr:cNvPr id="${id}" name="${name}"/><xdr:cNvCxnSpPr/></xdr:nvCxnSpPr>`
+    + `<xdr:spPr><a:xfrm flipV="1"><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom>`
+    + `<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln></xdr:spPr></xdr:cxnSp><xdr:clientData/></xdr:twoCellAnchor>`;
 }
 
 // ---- SPEC: the original "Spec.xlsx", untouched except for the data written into it ----
@@ -426,11 +455,11 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
         if (hasShape(drawing, names)) drawing = fillTextBox(drawing, names, text);
         else sheet = setCell(sheet, MATERIAL[k].split(':')[0], text);
       }
-      return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing: addMaterialLines(drawing, d) };
+      return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing: addMaterialLines(drawing, d, itemList) };
     });
     return stackPages(buf, pages[0].partNo);
   }
-  const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing: addMaterialLines(drawing, d) }));
+  const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing: addMaterialLines(drawing, d, itemList) }));
   return stackPages(buf, pages[0].partNo);
 }
 

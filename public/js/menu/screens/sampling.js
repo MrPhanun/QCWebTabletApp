@@ -3,7 +3,7 @@
 
 // Sampling Plan: Level + Shipment Qty range ("101-150") -> sample Qty
 function renderSampling(panel) {
-  let rows = [], editId = 0, level = 'Normal';
+  let rows = [], editId = 0, level = 'Normal', status = 'active';   // status: 'active' | 'deleted' (Delete only sets DelStatus)
   // Add / Edit / Delete follow Roles & Permissions (the server enforces them too)
   const canAdd = can('sampling.add'), canEdit = can('sampling.edit'), canDel = can('sampling.delete');
   panel.innerHTML = `
@@ -24,6 +24,11 @@ function renderSampling(panel) {
         <button class="icon-btn" id="spCancel" type="button" hidden>${ico('x')}${T('b.cancel')}</button>
       </div>
     </form>
+    <label class="flt-pdf"><span>${T('h.delStatus')}</span>
+      <div class="seg type-seg" id="spStatus" role="group" aria-label="Filter by Record Status">
+        <button type="button" data-v="active" aria-pressed="true">${T('st.active')}</button>
+        <button type="button" data-v="deleted" aria-pressed="false">${T('st.deleted')}</button>
+      </div></label>
     <div class="msg" id="spMsg" role="status"></div>
     <div id="spTables"></div>`;
 
@@ -52,14 +57,14 @@ function renderSampling(panel) {
       let body = '';
       list.forEach((r, i) => {
         const prev = list[i - 1];
-        if (prev && r.qtyFrom > prev.qtyTo + 1) {
+        if (status === 'active' && prev && r.qtyFrom > prev.qtyTo + 1) {
           body += `<tr class="gap"><td colspan="4">${esc(t('sp.gap', { from: prev.qtyTo + 1, to: r.qtyFrom - 1, level: LVL(l) }))}</td></tr>`;
         }
-        body += `<tr class="${r.id === editId ? 'editing' : ''}">
+        body += `<tr class="${status === 'deleted' ? 'deleted' : r.id === editId ? 'editing' : ''}">
           <td class="num">${r.qtyFrom}-${r.qtyTo}</td>
           <td class="num">${r.sampleQty}</td>
           <td class="meta">${esc(String(r.updateBy || ''))} · ${fmtDate(r.updateDate)}</td>
-          <td>${canEdit || canDel ? `<div class="row-actions">
+          <td>${status === 'active' && (canEdit || canDel) ? `<div class="row-actions">
             ${canEdit ? `<button class="icon-btn" data-edit="${r.id}">${ico('pencil')}${T('b.edit')}</button>` : ''}
             ${canDel ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}
           </div>` : ''}</td></tr>`;
@@ -73,9 +78,18 @@ function renderSampling(panel) {
   }
 
   async function load() {
-    try { rows = await api('GET', '/api/sampling'); drawTables(); }
+    try { rows = await api('GET', `/api/sampling?status=${status}`); drawTables(); }
     catch (e) { msg(e.message); }
   }
+  $('spStatus').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    status = b.dataset.v;
+    $('spStatus').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    if (editId) resetForm();
+    $('spForm').hidden = !canAdd || status === 'deleted';
+    msg('');
+    load();
+  };
 
   $('spTables').onclick = async e => {
     const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');

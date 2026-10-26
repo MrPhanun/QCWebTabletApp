@@ -19,7 +19,7 @@ function validateSampling(b) {
 async function saveSampling(id, r, userId) {
   const pool = await getPool();
   const write = id
-    ? `UPDATE MstSamplingPlan SET [Level]=@level, QtyFrom=@from, QtyTo=@to, SampleQty=@sample, UpdateBy=@user, UpdateDate=GETDATE() WHERE SysNo=@id;
+    ? `UPDATE MstSamplingPlan SET [Level]=@level, QtyFrom=@from, QtyTo=@to, SampleQty=@sample, UpdateBy=@user, UpdateDate=GETDATE() WHERE SysNo=@id AND DelStatus='Active';
        SET @rc = @@ROWCOUNT; SET @newId = @id;`
     : `INSERT INTO MstSamplingPlan ([Level], QtyFrom, QtyTo, SampleQty, RegBy, UpdateBy) VALUES (@level, @from, @to, @sample, @user, @user);
        SET @rc = @@ROWCOUNT; SET @newId = SCOPE_IDENTITY();`;
@@ -34,7 +34,7 @@ async function saveSampling(id, r, userId) {
       DECLARE @cf int, @ct int, @rc int = 0, @newId int = NULL;
       BEGIN TRAN;
       SELECT TOP 1 @cf = QtyFrom, @ct = QtyTo FROM MstSamplingPlan WITH (UPDLOCK, HOLDLOCK)
-        WHERE [Level] = @level AND QtyFrom <= @to AND QtyTo >= @from AND SysNo <> @id;
+        WHERE DelStatus = 'Active' AND [Level] = @level AND QtyFrom <= @to AND QtyTo >= @from AND SysNo <> @id;
       IF @cf IS NULL BEGIN ${write} END
       COMMIT;
       SELECT @cf AS cf, @ct AS ct, @rc AS rc, @newId AS newId;`);
@@ -46,10 +46,11 @@ async function handleSampling(req, res, session, id) {
   try {
     const pool = await getPool();
     if (!id && req.method === 'GET') {
-      const { recordset } = await pool.request().query(
+      const status = new URL(req.url, 'http://x').searchParams.get('status') === 'deleted' ? 'Deleted' : 'Active';
+      const { recordset } = await pool.request().input('status', sql.VarChar(10), status).query(
         `SELECT SysNo AS id, [Level] AS level, QtyFrom AS qtyFrom, QtyTo AS qtyTo, SampleQty AS sampleQty,
                 RegBy AS regBy, RegDate AS regDate, UpdateBy AS updateBy, UpdateDate AS updateDate
-         FROM MstSamplingPlan ORDER BY [Level], QtyFrom`);
+         FROM MstSamplingPlan WHERE DelStatus = @status ORDER BY [Level], QtyFrom`);
       return sendJson(res, 200, recordset);
     }
     if (req.method === 'POST' && !id || req.method === 'PUT' && id) {
@@ -63,7 +64,9 @@ async function handleSampling(req, res, session, id) {
       return sendJson(res, id ? 200 : 201, { id: out.newId });
     }
     if (req.method === 'DELETE' && id) {
-      const { rowsAffected } = await pool.request().input('id', sql.Int, id).query('DELETE FROM MstSamplingPlan WHERE SysNo = @id');
+      // Soft delete: the row stays, only DelStatus changes
+      const { rowsAffected } = await pool.request().input('id', sql.Int, id).input('user', sql.VarChar(80), session.id)
+        .query("UPDATE MstSamplingPlan SET DelStatus = 'Deleted', UpdateBy = @user, UpdateDate = GETDATE() WHERE SysNo = @id AND DelStatus = 'Active'");
       return rowsAffected[0] ? sendJson(res, 200, { ok: true }) : sendJson(res, 404, { error: 'This range no longer exists' });
     }
     sendJson(res, 405, { error: 'Method not allowed' });
@@ -83,7 +86,7 @@ async function handleSamplingLookup(req, res, session) {
     const pool = await getPool();
     const { recordset } = await pool.request().input('level', sql.VarChar(10), level).input('qty', sql.Int, qty).query(
       `SELECT TOP 1 QtyFrom AS qtyFrom, QtyTo AS qtyTo, SampleQty AS sampleQty FROM MstSamplingPlan
-       WHERE [Level] = @level AND @qty BETWEEN QtyFrom AND QtyTo`);
+       WHERE DelStatus = 'Active' AND [Level] = @level AND @qty BETWEEN QtyFrom AND QtyTo`);
     recordset[0] ? sendJson(res, 200, { level, qty, ...recordset[0] }) : sendJson(res, 404, { error: `No ${level} range covers ${qty}` });
   } catch (err) {
     console.error('Sampling lookup error:', err.message);
