@@ -135,6 +135,9 @@ table.perm-grid tr.me td.sticky { background: #ecfdf5; }
 .spec-editor input:disabled, .spec-editor textarea:disabled { background: none; color: var(--ink); }
 table.data td.txt { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 table.data tr.copying td { background: rgba(254,243,199,.6); }
+/* Deleted records (DelStatus = 'Deleted'): light pink; beats the frozen first / last cells */
+table.data tbody tr.deleted td, table.data.frz tbody tr.deleted td:nth-child(1), table.data.frz tbody tr.deleted td:last-child,
+table.data.frz tbody tr.deleted:hover td:nth-child(1), table.data.frz tbody tr.deleted:hover td:last-child { background: #FDE2E4; }
 
 .oqc-prob { height: 34px; padding: 3px; border-radius: 10px; min-width: 150px; }
 .oqc-prob button { border-radius: 7px; font-size: 13px; }

@@ -54,7 +54,7 @@ async function saveRecord(id, r, userId) {
     .query(`SET XACT_ABORT ON;
       DECLARE @dup int = NULL, @rc int = 0, @newId int = NULL, @reset bit = 0;
       BEGIN TRAN;
-      SELECT TOP 1 @dup = SysNo FROM OqcRecord WITH (UPDLOCK, HOLDLOCK) WHERE LotNo = @lot AND BoxNo = @box AND SysNo <> @id;
+      SELECT TOP 1 @dup = SysNo FROM OqcRecord WITH (UPDLOCK, HOLDLOCK) WHERE DelStatus = 'Active' AND LotNo = @lot AND BoxNo = @box AND SysNo <> @id;
       IF @dup IS NULL
       BEGIN
         IF @id = 0
@@ -76,7 +76,7 @@ async function saveRecord(id, r, userId) {
             Qty=@qty,
             PdfPrinted = CASE WHEN @reset = 1 THEN 0 ELSE PdfPrinted END, Probability=@probability, Total=@total, Inspector=@inspector, CheckedBy=@checkedBy, PageCount=@pageCount,
             Complete=@complete, Data=@data, UpdateBy=@user, UpdateDate=GETDATE()
-          WHERE SysNo = @id;
+          WHERE SysNo = @id AND DelStatus = 'Active';
           SET @rc = @@ROWCOUNT; SET @newId = @id;
         END
         -- Once a record (draft or saved) exists for the Part No, its SPEC is no longer a First Slot
@@ -108,13 +108,13 @@ async function handleOqcRecords(req, res, session, id) {
     if (req.method === 'GET') {
       const q = new URL(req.url, 'http://x').searchParams;
       if (q.has('customers')) {   // every Customer on the saved records, for the Customer search list
-        const { recordset } = await pool.request().query("SELECT DISTINCT Customer AS customer FROM OqcRecord WHERE Customer <> '' ORDER BY Customer");
+        const { recordset } = await pool.request().query("SELECT DISTINCT Customer AS customer FROM OqcRecord WHERE DelStatus = 'Active' AND Customer <> '' ORDER BY Customer");
         return sendJson(res, 200, recordset.map(x => x.customer));
       }
       if (q.has('lot')) {
         const { recordset } = await pool.request().input('lot', sql.VarChar(50), String(q.get('lot')).trim().slice(0, 50))
           .input('box', sql.VarChar(20), String(q.get('box') || '').trim().slice(0, 20))
-          .query(`SELECT ${REC_COLS} FROM OqcRecord WHERE LotNo = @lot AND BoxNo = @box`);
+          .query(`SELECT ${REC_COLS} FROM OqcRecord WHERE DelStatus = 'Active' AND LotNo = @lot AND BoxNo = @box`);
         return sendJson(res, 200, recordset);
       }
       const text = String(q.get('q') || '').trim().slice(0, 100);
@@ -122,11 +122,12 @@ async function handleOqcRecords(req, res, session, id) {
       const type = ['Normal', 'First Slot', 'Sample'].includes(q.get('type')) ? q.get('type') : '';
       const pdf = q.get('pdf') === 'printed' ? 1 : q.get('pdf') === 'draft' ? 0 : null;   // PDF Status: Printed / Draft / any
       const customer = String(q.get('customer') || '').trim().slice(0, 200);
+      const status = q.get('status') === 'deleted' ? 'Deleted' : 'Active';   // Delete only sets DelStatus
       const day = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !isNaN(Date.parse(v)) ? v : null;
       const { recordset } = await pool.request().input('text', sql.NVarChar(100), text).input('like', sql.NVarChar(210), like)
-        .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('pdf', sql.Bit, pdf).input('from', sql.Date, day(q.get('from'))).input('to', sql.Date, day(q.get('to')))
+        .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('pdf', sql.Bit, pdf).input('status', sql.VarChar(10), status).input('from', sql.Date, day(q.get('from'))).input('to', sql.Date, day(q.get('to')))
         .query(`SELECT TOP 200 ${REC_COLS} FROM OqcRecord
-          WHERE (@text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
+          WHERE DelStatus = @status AND (@text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
              OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\')
             AND (@type = '' OR [Type] = @type) AND (@customer = '' OR Customer = @customer) AND (@pdf IS NULL OR PdfPrinted = @pdf)
             AND (@from IS NULL OR ShipmentDate >= @from) AND (@to IS NULL OR ShipmentDate <= @to)
@@ -134,7 +135,9 @@ async function handleOqcRecords(req, res, session, id) {
       return sendJson(res, 200, recordset);
     }
     if (req.method === 'DELETE' && id) {
-      const { rowsAffected } = await pool.request().input('id', sql.Int, id).query('DELETE FROM OqcRecord WHERE SysNo = @id');
+      // Soft delete: the record stays, only DelStatus changes (its generated Excel / PDF files are removed)
+      const { rowsAffected } = await pool.request().input('id', sql.Int, id).input('user', sql.VarChar(80), session.id)
+        .query("UPDATE OqcRecord SET DelStatus = 'Deleted', UpdateBy = @user, UpdateDate = GETDATE() WHERE SysNo = @id AND DelStatus = 'Active'");
       if (!rowsAffected[0]) return sendJson(res, 404, { error: 'This record no longer exists' });
       removeRecordFiles(id);
       return sendJson(res, 200, { ok: true });
@@ -172,7 +175,7 @@ async function handleOqcSpec(req, res, session) {
     const found = (await pool.request().input('part', sql.NVarChar(100), partNo).input('like', sql.NVarChar(210), like)
       .input('specId', sql.Int, specId).query(
       `SELECT SysNo AS id, Customer AS customer, PartNo AS partNo, [Type] AS type, Wire AS wire, Terminal AS terminal, Housing AS housing, Other AS other
-       FROM MstSpec WHERE (PartNo = @part OR PartNo LIKE @like ESCAPE '\\') AND (@specId = 0 OR SysNo = @specId) ORDER BY PartNo, SysNo`)).recordset;
+       FROM MstSpec WHERE DelStatus = 'Active' AND (PartNo = @part OR PartNo LIKE @like ESCAPE '\\') AND (@specId = 0 OR SysNo = @specId) ORDER BY PartNo, SysNo`)).recordset;
     // More than one SPEC: the user chooses which one this item needs
     if (found.length > 1) return sendJson(res, 200, { choices: found.map(x => ({ id: x.id, partNo: x.partNo, customer: x.customer, type: x.type,
       wire: x.wire, terminal: x.terminal, housing: x.housing, other: x.other })) });

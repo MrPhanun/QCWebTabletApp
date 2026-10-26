@@ -29,6 +29,11 @@ function renderDraft(panel) {
           <button type="button" data-v="draft" aria-pressed="false">${T('st.draft')}</button>
           <button type="button" data-v="printed" aria-pressed="false">${T('st.printed')}</button>
         </div></label>
+      <label class="flt-pdf"><span>${T('h.delStatus')}</span>
+        <div class="seg type-seg" id="drDel" role="group" aria-label="Filter by Record Status" data-value="active">
+          <button type="button" data-v="active" aria-pressed="true">${T('st.active')}</button>
+          <button type="button" data-v="deleted" aria-pressed="false">${T('st.deleted')}</button>
+        </div></label>
       <button class="btn-primary" id="drSearch" type="button">${ico('search')}${T('b.search')}</button>
       <span class="count" id="drCount"></span>
       <div class="msg" id="drMsg" role="status"></div>
@@ -59,12 +64,13 @@ function renderDraft(panel) {
     } catch { /* the list is only a help: search still works */ }
   }
   async function search() {
-    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, type: $('drType').dataset.value, customer: $('drCust').value, pdf: $('drPdf').dataset.value });
+    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, type: $('drType').dataset.value, customer: $('drCust').value, pdf: $('drPdf').dataset.value, status: $('drDel').dataset.value });
+    const isDeleted = $('drDel').dataset.value === 'deleted';
     try {
       list = await api('GET', `/api/oqc/records?${qs}`);
       $('drCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
       const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drType').dataset.value || $('drCust').value || $('drPdf').dataset.value;
-      $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}">
+      $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}"${isDeleted ? ' class="deleted"' : ''}>
           <td class="num">${s2(r.lot)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
           <td>${typePill(r.type)}</td>
           <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(r.checkDate)}</td><td>${s2(r.shipDate)}</td>
@@ -74,9 +80,9 @@ function renderDraft(panel) {
           <td>${r.total ? `<span class="pill ${r.total === 'NG' ? 'ng' : 'ok'}">${r.total}</span>` : ''}</td>
           <td>${printPill(r.pdfPrinted)}</td>
           <td class="meta">${s2(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
-          <td><div class="row-actions"><button class="icon-btn" data-open="${r.id}">${ico('folderOpen')}${T('b.open')}</button>${canExcel
+          <td>${isDeleted ? `<span class="pill draft">${esc(t('st.deleted'))}</span>` : `<div class="row-actions"><button class="icon-btn" data-open="${r.id}">${ico('folderOpen')}${T('b.open')}</button>${canExcel
             ? `<button class="icon-btn" data-excel="${r.id}">${ico('excel')}${T('b.excel')}</button><button class="icon-btn" data-pdf="${r.id}">${ico('printer')}${T('b.pdf')}</button>` : ''}${can('daily.delete')
-            ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
+            ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div>`}</td>
         </tr>`).join('') || `<tr><td colspan="14" class="empty-row">${esc(t(filtered ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
     } catch (err) { msg(err.message); }
   }
@@ -148,6 +154,12 @@ function renderDraft(panel) {
     const b = e.target.closest('button'); if (!b) return;
     $('drPdf').dataset.value = b.dataset.v;
     $('drPdf').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    search();
+  });
+  $('drDel').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('drDel').dataset.value = b.dataset.v;
+    $('drDel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
     search();
   });
   $('drCust').addEventListener('change', search);

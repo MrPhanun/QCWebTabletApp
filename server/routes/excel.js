@@ -81,7 +81,10 @@ async function handleRecordExport(req, res, session, id, kind) {
     const name = `OQC_${rec.LotNo}${rec.BoxNo ? '_' + rec.BoxNo : ''}`.replace(/[^\w.-]+/g, '_').slice(0, 80) + ext;
     const type = isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     const file = recordFile(id, ext);
-    if (rec.printed && fs.existsSync(file)) return sendFile(res, fs.readFileSync(file), name, type);
+    // A stored file made before the templates or the builder last changed is made again, so template changes show up
+    const stale = f => { try { return fs.statSync(file).mtimeMs < fs.statSync(f).mtimeMs; } catch { return false; } };
+    const outdated = [path.join(__dirname, '..', 'excel-builder.js'), ...fs.readdirSync(path.join(__dirname, '..', '..', 'templates')).map(n => path.join(__dirname, '..', '..', 'templates', n))].some(stale);
+    if (rec.printed && fs.existsSync(file) && !outdated) return sendFile(res, fs.readFileSync(file), name, type);
 
     const pages = JSON.parse(rec.Data);
     let buf;

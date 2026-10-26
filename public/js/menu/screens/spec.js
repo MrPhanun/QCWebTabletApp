@@ -112,6 +112,10 @@ function renderSpec(panel) {
         <button type="button" data-type="Normal" aria-pressed="false">${T('type.normal')}</button>
         <button type="button" data-type="First Slot" aria-pressed="false">${T('type.firstSlot')}</button>
       </div>
+      <div class="seg type-seg" id="scStatus" role="group" aria-label="Filter by Record Status" data-value="active">
+        <button type="button" data-v="active" aria-pressed="true">${T('st.active')}</button>
+        <button type="button" data-v="deleted" aria-pressed="false">${T('st.deleted')}</button>
+      </div>
       ${canAdd ? `<button class="btn-primary" id="scAdd" type="button">${ico('plus')}${T('b.add')}</button>` : ''}
       <span class="count" id="scCount"></span>
       <span class="spinner" aria-hidden="true"></span><span class="busy-note">${T('loading')}</span>
@@ -132,7 +136,7 @@ function renderSpec(panel) {
     const ty = $('scTypeFilter').dataset.value, cu = $('scCustFilter').value;
     const list = rows.filter(r => hit(r) && (!ty || r.type === ty) && (!cu || r.customer === cu));
     $('scCount').textContent = q || ty || cu ? t('sc.countOf', { n: list.length, total: rows.length }) : t('sc.count', { n: rows.length });
-    $('scBody').innerHTML = list.map(r => `<tr class="${r.id === editId && mode === 'edit' ? 'editing' : r.id === editId && mode === 'copy' ? 'copying' : ''}">
+    $('scBody').innerHTML = list.map(r => `<tr class="${$('scStatus').dataset.value === 'deleted' ? 'deleted' : r.id === editId && mode === 'edit' ? 'editing' : r.id === editId && mode === 'copy' ? 'copying' : ''}">
         <td>${s(r.customer)}</td>
         <td>${s(r.partNo)}</td>
         <td><span class="type-badge ${r.type === 'First Slot' ? 'first' : 'normal'}">${s(t(r.type === 'First Slot' ? 'type.firstSlot' : 'type.normal'))}</span></td>
@@ -141,10 +145,11 @@ function renderSpec(panel) {
         <td class="meta">${s(r.updateBy)} · ${fmtDate(r.updateDate)}</td>
         <td><div class="row-actions">
           <button class="icon-btn" data-act="view" data-id="${r.id}">${ico('eye')}${T('b.view')}</button>
+          ${$('scStatus').dataset.value === 'deleted' ? '' : `
           ${canExcel ? `<button class="icon-btn" data-act="print" data-id="${r.id}">${ico('excel')}${T('b.excel')}</button>` : ''}
           ${canEdit ? `<button class="icon-btn" data-act="edit" data-id="${r.id}">${ico('pencil')}${T('b.edit')}</button>` : ''}
           ${canAdd ? `<button class="icon-btn" data-act="copy" data-id="${r.id}">${ico('copy')}${T('b.copy')}</button>` : ''}
-          ${canDel ? `<button class="icon-btn del" data-act="del" data-id="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div></td>
+          ${canDel ? `<button class="icon-btn del" data-act="del" data-id="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}`}</div></td>
       </tr>`).join('') || `<tr><td colspan="10" class="empty-row">${esc(t(rows.length ? 'sc.noMatch' : 'sc.none'))}</td></tr>`;
     // All rows are in the list; it shows 7 rows and scrolls inside itself for the rest
     $('scBody').closest('.spec-list').classList.toggle('scrolling', list.length > ROWS_STEP);
@@ -257,7 +262,7 @@ function renderSpec(panel) {
     sel.value = names.includes(keep) ? keep : '';
   }
   async function load() {
-    try { rows = await api('GET', '/api/spec'); fillCustomers(); drawList(); }
+    try { rows = await api('GET', `/api/spec?status=${$('scStatus').dataset.value}`); fillCustomers(); drawList(); }
     catch (e) { msg(e.message); }
   }
 
@@ -304,6 +309,16 @@ function renderSpec(panel) {
   }
   $('scType').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setSeg($('scType'), b.dataset.type); applyForm(); } });
   if (canAdd) $('scAdd').onclick = () => openEditor('new');
+  // Active / Deleted (Delete only sets DelStatus); a deleted SPEC can only be viewed
+  $('scStatus').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('scStatus').dataset.value = b.dataset.v;
+    $('scStatus').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    if (canAdd) $('scAdd').hidden = b.dataset.v === 'deleted';
+    if (mode) closeEditor();
+    msg('');
+    load();
+  });
   $('scCancel').onclick = () => { closeEditor(); msg(''); };
 
   $('scBody').onclick = async e => {
