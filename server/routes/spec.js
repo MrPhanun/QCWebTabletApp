@@ -45,7 +45,9 @@ async function saveSpec(id, r, userId) {
       .input('customer', sql.NVarChar(100), r.customer).input('partNo', sql.NVarChar(100), r.partNo).input('wire', sql.NVarChar(1000), r.wire)
       .input('terminal', sql.NVarChar(1000), r.terminal).input('housing', sql.NVarChar(1000), r.housing)
       .input('other', sql.NVarChar(1000), r.other).input('type', sql.VarChar(20), r.type).input('user', sql.VarChar(80), userId)
-      .query(`IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE PartNo = @partNo AND Wire = @wire AND Terminal = @terminal AND Housing = @housing AND Other = @other AND SysNo <> @id)
+      .query(`-- A Part No that already has an OQC record (Search Draft / Save) is no longer First Slot
+      IF @type = 'First Slot' AND EXISTS (SELECT 1 FROM OqcRecord WHERE PartNo = @partNo) SET @type = 'Normal';
+      IF EXISTS (SELECT 1 FROM MstSpec WITH (UPDLOCK, HOLDLOCK) WHERE PartNo = @partNo AND Wire = @wire AND Terminal = @terminal AND Housing = @housing AND Other = @other AND SysNo <> @id)
           SELECT CAST(1 AS bit) AS dup, 0 AS rc, NULL AS newId
         ELSE IF @id = 0 BEGIN
           INSERT INTO MstSpec (Customer, PartNo, [Type], Wire, Terminal, Housing, Other, RegBy, UpdateBy)

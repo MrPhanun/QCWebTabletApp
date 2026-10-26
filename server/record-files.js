@@ -12,4 +12,5 @@ function saveRecordFile(id, ext, buf) {
 function removeRecordFiles(id) {
   for (const ext of ['.xlsx', '.pdf']) fs.rmSync(recordFile(id, ext), { force: true });
 }
-module.exports = { recordFile, saveRecordFile, removeRecordFiles };
+const removeRecordFile = (id, ext) => fs.rmSync(recordFile(id, ext), { force: true });
+module.exports = { recordFile, saveRecordFile, removeRecordFiles, removeRecordFile };

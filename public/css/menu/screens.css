@@ -322,3 +322,13 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .flt-pdf { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
 .type-seg button[data-v="printed"][aria-pressed="true"] { background: var(--accent-1); color: #fff; }
 .type-seg button[data-v="draft"][aria-pressed="true"] { background: #d97706; color: #fff; }
+
+/* Records table: Lot No - Part No and the action buttons stay put while the rest scrolls sideways */
+table.data.frz th:nth-child(1), table.data.frz td:nth-child(1), table.data.frz th:last-child, table.data.frz td:last-child { position: sticky; z-index: 1; background: #fff; }
+table.data.frz th:nth-child(1), table.data.frz th:last-child { background: #ecf9f2; z-index: 3; }
+table.data.frz tr:not(.empty) td:last-child { z-index: 2; }
+table.data.frz th:nth-child(1), table.data.frz td:nth-child(1) { left: 0; min-width: 90px; box-shadow: 1px 0 0 var(--line); }
+
+table.data.frz th:last-child, table.data.frz td:last-child { right: 0; box-shadow: -1px 0 0 var(--line); }
+table.data.frz tbody tr:hover td:nth-child(1), table.data.frz tbody tr:hover td:last-child { background: #F1FCF6; }
+table.data.frz td.empty-row { position: static; min-width: 0; max-width: none; box-shadow: none; }

@@ -1,2 +1,1 @@
-Login failed: Failed to connect to 192.168.1.22:1433 in 15000ms
-Login failed: Failed to connect to 192.168.1.22:1433 in 15000ms
+SPEC error: Violation of UNIQUE KEY constraint 'UQ_MstSpec_PartNo'. Cannot insert duplicate key in object 'dbo.MstSpec'. The duplicate key value is (2150388-00).
