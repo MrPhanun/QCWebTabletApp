@@ -39,7 +39,7 @@ function renderSpec(panel) {
   const field = (p, id, html) => p ? html.replace(/\bid="([^"]+)"/, 'data-of="$1" readonly tabindex="-1"') : html;
   const sheet = (p, total) => `
     <section class="oqc-sheet spec-page" data-page="${p}">
-      ${oqcHead(`<span>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}</span><small class="oqc-sheet-page">Page ${p + 1} / ${total}</small>`, 'spec')}
+      ${oqcHead(`<span>${bi('ថ្ងៃត្រួតពិនិត្យ', 'CHECK DATE')}</span><small class="oqc-sheet-page">Page ${p + 1} / ${total}</small>`, $('scType') && $('scType').dataset.value === 'First Slot' ? 'spec' : 'oqc')}
 
       <div class="oqc-info-wrap"><table class="oqc oqc-info">
         <tr>${OQC_INFO.map(([km, en]) => `<th class="c">${bi(km, en)}</th>`).join('')}</tr>
@@ -225,6 +225,7 @@ function renderSpec(panel) {
     drawPages(Math.max(1, Math.ceil(lens.length / PER_PAGE)), head, lens);
     edR = r;
     setSeg($('scType'), r && r.type === 'First Slot' ? 'First Slot' : 'Normal');
+    applyForm();
     $('scType').querySelectorAll('button').forEach(b => b.disabled = m === 'view');
     setEditorTitle();
     $('scSave').hidden = m === 'view' || (m === 'edit' ? !canEdit : !canAdd);
@@ -292,7 +293,16 @@ function renderSpec(panel) {
   }
   $('scCustFilter').addEventListener('change', drawList);
   $('scTypeFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setSeg($('scTypeFilter'), b.dataset.type); drawList(); } });
-  $('scType').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSeg($('scType'), b.dataset.type); });
+  // The sheet header follows the Type: First Slot = the Spec form (First Lot, QC-RE-048), Normal = OQC Data (QC-RE-002)
+  function applyForm() {
+    const f = OQC_FORMS[$('scType').dataset.value === 'First Slot' ? 'spec' : 'oqc'];
+    panel.querySelectorAll('.spec-page').forEach(pg => {
+      pg.querySelector('.oqc-title .km').textContent = f.km;
+      pg.querySelector('.oqc-title b').textContent = `[${f.en}]`;
+      pg.querySelector('.oqc-ref small').innerHTML = f.ref;
+    });
+  }
+  $('scType').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setSeg($('scType'), b.dataset.type); applyForm(); } });
   if (canAdd) $('scAdd').onclick = () => openEditor('new');
   $('scCancel').onclick = () => { closeEditor(); msg(''); };
 
@@ -334,7 +344,7 @@ function renderSpec(panel) {
 
   langHook = () => {
     fillCustomers(); drawList(); setEditorTitle();
-    if (mode) drawPages(pageCount(), readHead(), readLens());   // redraw the sheets in the new language, keeping what is typed
+    if (mode) { drawPages(pageCount(), readHead(), readLens()); applyForm(); }   // redraw the sheets in the new language, keeping what is typed
   };
   load();
 }

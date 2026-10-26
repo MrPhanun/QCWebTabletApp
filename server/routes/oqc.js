@@ -1,6 +1,6 @@
 const { sql, getPool, MAX_INT } = require('../db');
 const { sendJson, readJson } = require('../http');
-const { removeRecordFiles } = require('../record-files');
+const { removeRecordFiles, removeRecordFile } = require('../record-files');
 
 // ---- Saved OQC records (OqcRecord): one per label (LotNo + BoxNo), all pages in Data as JSON ----
 const REC_COLS = `SysNo AS id, LotNo AS lot, BoxNo AS box, ItemCode AS itemCode, PartNo AS partNo, [Type] AS type, Customer AS customer,
@@ -67,14 +67,14 @@ async function saveRecord(id, r, userId) {
         END
         ELSE
         BEGIN
-          -- Anything changed (Data holds every page): the stored Excel / PDF are out of date, back to Draft
+          -- Excel status is kept as is (a Printed record stays Printed); a revised record goes back to Draft for PDF only
           IF NOT EXISTS (SELECT 1 FROM OqcRecord WHERE SysNo = @id AND LotNo = @lot AND BoxNo = @box AND PartNo = @partNo
               AND ISNULL(ShipmentDate, '1900-01-01') = @shipDate AND ISNULL(Qty, -1) = ISNULL(@qty, -1)
               AND Complete = @complete AND Data = @data COLLATE Latin1_General_BIN2)
             SET @reset = 1;
           UPDATE OqcRecord SET LotNo=@lot, BoxNo=@box, ItemCode=@itemCode, PartNo=@partNo, [Type]=@type, Customer=@customer, CheckDate=@checkDate, ShipmentDate=@shipDate,
             Qty=@qty,
-            ExcelPrinted = CASE WHEN @reset = 1 THEN 0 ELSE ExcelPrinted END, PdfPrinted = CASE WHEN @reset = 1 THEN 0 ELSE PdfPrinted END, Probability=@probability, Total=@total, Inspector=@inspector, CheckedBy=@checkedBy, PageCount=@pageCount,
+            PdfPrinted = CASE WHEN @reset = 1 THEN 0 ELSE PdfPrinted END, Probability=@probability, Total=@total, Inspector=@inspector, CheckedBy=@checkedBy, PageCount=@pageCount,
             Complete=@complete, Data=@data, UpdateBy=@user, UpdateDate=GETDATE()
           WHERE SysNo = @id;
           SET @rc = @@ROWCOUNT; SET @newId = @id;
@@ -147,7 +147,7 @@ async function handleOqcRecords(req, res, session, id) {
       const out = await saveRecord(id || 0, r, session.id);
       if (out.dup != null) return sendJson(res, 409, { error: `Lot ${r.lot}${r.box ? `, Box ${r.box}` : ''} is already saved`, existingId: out.dup });
       if (!out.rc) return sendJson(res, 404, { error: 'This record no longer exists' });
-      if (out.reset) removeRecordFiles(out.newId);
+      if (out.reset) removeRecordFile(out.newId, '.pdf');
       return sendJson(res, id ? 200 : 201, { id: out.newId });
     }
     sendJson(res, 405, { error: 'Method not allowed' });
