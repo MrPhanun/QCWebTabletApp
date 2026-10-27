@@ -132,15 +132,25 @@ function specSplitStyles(ctx) {
   const nB = +ctx.styles.match(/<borders count="(\d+)"/)[1], nF = +ctx.styles.match(/<fonts count="(\d+)"/)[1];
   ctx.styles = ctx.styles
     .replace(/<borders count="\d+">([\s\S]*?)<\/borders>/, (m, b) => `<borders count="${nB + 2}">${b}${edge(0, 'R')}${edge(0, 'L')}</borders>`)
-    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 1}"${a}>${b}<font><sz val="7"/><name val="Cambria"/><family val="1"/></font></fonts>`);
-  const left = addXf(ctx, `<xf numFmtId="0" fontId="22" fillId="0" borderId="${nB}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`);
+    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 2}"${a}>${b}<font><sz val="9"/><name val="Cambria"/><family val="1"/></font><font><sz val="10.5"/><name val="Cambria"/><family val="1"/></font></fonts>`);
+  const left = addXf(ctx, `<xf numFmtId="0" fontId="${nF + 1}" fillId="0" borderId="${nB}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`);
   const right = addXf(ctx, `<xf numFmtId="0" fontId="${nF}" fillId="0" borderId="${nB + 1}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`);
   return (ctx.cache.spec = { left, right });
 }
 function setSpec(sheet, side, row, spec, ctx) {
   const m = String(spec ?? '').match(SPEC_TOL);
   const [c1, c3] = side.spec, c2 = colName(colNum(c1) + 1);
-  if (!m || !ctx) return setCell(sheet, `${c1}${row}`, spec);
+  if (!m && ctx && String(spec ?? '') !== '') {
+    // plain SPEC text (30±5, Max10, (60)): middle left in its box
+    const s = styleOf(sheet, `${c1}${row}`);
+    if (s !== undefined) {
+      const key = 'l' + s;
+      ctx.cache = ctx.cache || {};
+      ctx.cache[key] ??= addXf(ctx, centerXf(xfList(ctx.styles)[+s]).replace('horizontal="center"', 'horizontal="left"'));
+      sheet = useStyle(sheet, `${c1}${row}`, ctx.cache[key]);
+    }
+  }
+  if (!m || !ctx) return setCell(sheet, `${c1}${row}`, String(spec ?? '') === '' ? spec : { text: String(spec), size: 10.5, font: 'Cambria' });
   const st = specSplitStyles(ctx);
   sheet = sheet.replace(`<mergeCell ref="${c1}${row}:${c3}${row}"/>`, `<mergeCell ref="${c1}${row}:${c2}${row}"/>`);
   sheet = useStyle(useStyle(sheet, `${c1}${row}`, st.left), `${c2}${row}`, st.left);
@@ -150,9 +160,54 @@ function setSpec(sheet, side, row, spec, ctx) {
 ${m[3]}`);
 }
 
+// The two Length Check tables (left and right) get the same column widths: each part (position, SPEC, each sample) takes the average
+// of its two widths, shared out over that part's columns in proportion to what they were
+function equalizeLengthTables(sheet) {
+  const m = sheet.match(/<cols>([\s\S]*?)<\/cols>/);
+  if (!m) return sheet;
+  const cols = [];   // per column: [attributes without min/max/width, width]
+  for (const c of m[1].match(/<col\b[^>]*\/>/g) || []) {
+    const a = k => (c.match(new RegExp(`\\b${k}="([^"]*)"`)) || [])[1];
+    const rest = c.replace(/\s(?:min|max|width)="[^"]*"/g, '').replace(/^<col/, '').replace(/\/>$/, '');
+    for (let i = +a('min'); i <= Math.min(+a('max'), 100); i++) cols[i] = [rest, +a('width')];
+  }
+  const parts = k => [LEFT.pos, LEFT.spec, ...LEFT.samples].map((l, i) => [l, [RIGHT.pos, RIGHT.spec, ...RIGHT.samples][i]]);
+  for (const [l, r] of parts()) {
+    const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
+    const li = idx(l), ri = idx(r);
+    if (l === LEFT.spec) {   // the SPEC box is split into "100 ±" and the stacked tolerance: column by column the same, so the split falls at the same place
+      li.forEach((c, k) => { cols[c][1] = cols[ri[k]][1] = Math.round((cols[c][1] + cols[ri[k]][1]) / 2 * 1000) / 1000; });
+      continue;
+    }
+    const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
+    const target = (sum(li) + sum(ri)) / 2;
+    for (const ix of [li, ri]) { const f = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
+  }
+  const out = cols.map((c, i) => c && `<col min="${i}" max="${i}" width="${c[1]}"${c[0]}/>`).filter(Boolean).join('');
+  return sheet.replace(m[0], `<cols>${out}${(m[1].match(/<col\b[^>]*\bmin="\d{3,}"[^>]*\/>/g) || []).join('')}</cols>`);
+}
+
+// A material line is one cell per row (no wrapping, it would run on past the Result box): a line longer than the box goes
+// on under it, broken after a space / comma / semicolon where it can
+const MATERIAL_LINE_MAX = 58;
+function wrapLine(line) {
+  const out = [];
+  let rest = String(line);
+  while (rest.length > MATERIAL_LINE_MAX) {
+    const head = rest.slice(0, MATERIAL_LINE_MAX + 1);
+    const at = Math.max(head.lastIndexOf(' '), head.lastIndexOf(','), head.lastIndexOf(';'));
+    const cut = at > MATERIAL_LINE_MAX / 2 ? at + 1 : MATERIAL_LINE_MAX;
+    out.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  out.push(rest);
+  return out;
+}
+
 // ---- OQC Data Information: values pasted into the template's own cells, nothing else changed ----
 function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
+  sheet = equalizeLengthTables(sheet);
   const items = d.items || {};
   // AT3:AV3 are three small unmerged cells: the date runs across them, a little smaller so that it fits
   if (d.checkDate) set('AT3', { text: dmy(d.checkDate), size: 8, font: 'Times New Roman' });
@@ -167,9 +222,14 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     // Not used ("/"): no text, a line shape is drawn over the box instead (see addMaterialLines)
     if (String((d.material || {})[k] || '') === '/') continue;
     if (textBoxes) continue;
-    const lines = String((d.material || {})[k] || '').split(/\r?\n/);
+    const lines = String((d.material || {})[k] || '').split(/\r?\n/).flatMap(wrapLine);
     if (lines.length > rows.length) lines.splice(rows.length - 1, lines.length - rows.length + 1, lines.slice(rows.length - 1).join(' '));
-    lines.forEach((line, i) => set(`C${rows[i]}`, line));
+    // every line takes the font of the first line (the lower rows of a box are set smaller in the template)
+    const first = styleOf(sheet, `C${rows[0]}`);
+    lines.forEach((line, i) => {
+      if (i > 0 && first !== undefined && line) sheet = useStyle(sheet, `C${rows[i]}`, first);
+      set(`C${rows[i]}`, line);
+    });
   }
   // 3) Inspection point ① .. ⑨ (same order as itemList)
   // Every result is a 3-column x 2-row box, merged and centered like ⑤ (AT17:AV18) is in the template: the box is merged,
@@ -418,6 +478,8 @@ async function buildSheetWorkbook(tpl, pages, fill) {
   zip.file('xl/_rels/workbook.xml.rels', wbRels);
   zip.file('[Content_Types].xml', types);
   zip.file('xl/styles.xml', ctx.styles);
+  // SPEC column header on three lines: តំលៃ / ប្រវែងកំនត់ / [SPEC]
+  if (zip.file('xl/sharedStrings.xml')) zip.file('xl/sharedStrings.xml', (await read('xl/sharedStrings.xml')).replace('<t>តំលៃប្រវែងកំនត់[SPEC]</t>', '<t xml:space="preserve">តំលៃ\nប្រវែងកំនត់\n[SPEC]</t>'));
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 

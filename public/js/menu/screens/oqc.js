@@ -175,11 +175,16 @@ function renderOQC(panel, opts = {}) {
       i.readOnly = on; i.tabIndex = on ? -1 : 0;
     }));
     if (!on) return;
-    const n = rows.length, cols = 5 - SAMPLE_COLS;
-    rows.forEach((tr, r) => {
-      [...tr.querySelectorAll('td.smp')].slice(SAMPLE_COLS).forEach((td, c) => {
-        const x = y => ((cols - cols * y / n - c) * 100).toFixed(2) + '%';
-        td.insertAdjacentHTML('beforeend', `<svg class="slash" aria-hidden="true"><line x1="${x(r)}" y1="0" x2="${x(r + 1)}" y2="100%"/></svg>`);
+    // the line runs on through the Result row (its ④⑤ boxes) to the last row; each row takes its share of the height
+    const lines = [...rows, ...table.querySelectorAll('tbody tr.sec')];
+    const hs = lines.map(tr => tr.offsetHeight);
+    const w = hs.every(h => h > 0) ? hs : hs.map(() => 1), total = w.reduce((a, b) => a + b, 0), cols = 5 - SAMPLE_COLS;
+    let done = 0;
+    lines.forEach((tr, r) => {
+      const y0 = done / total, y1 = (done += w[r]) / total;
+      [...tr.querySelectorAll('td.smp, td.smp-res')].slice(SAMPLE_COLS).forEach((td, c) => {
+        const x = y => ((cols - cols * y - c) * 100).toFixed(2) + '%';
+        td.insertAdjacentHTML('beforeend', `<svg class="slash" aria-hidden="true"><line x1="${x(y0)}" y1="0" x2="${x(y1)}" y2="100%"/></svg>`);
       });
     });
   }

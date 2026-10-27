@@ -73,8 +73,8 @@ function renderDraft(panel) {
       $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}"${isDeleted ? ' class="deleted"' : ''}>
           <td class="num">${s2(r.lot)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
           <td>${typePill(r.type)}</td>
-          <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(r.checkDate)}</td><td>${s2(r.shipDate)}</td>
-          <td class="num">${r.qty ?? ''}</td>
+          <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(dmy(r.checkDate))}</td><td>${s2(dmy(r.shipDate))}</td>
+          <td class="num">${r.qty == null || r.qty === '' || isNaN(r.qty) ? s2(r.qty ?? '') : Number(r.qty).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
           <td class="num">${r.pageCount}</td>
           <td><span class="pill ${r.complete ? 'done' : 'draft'}">${esc(t(r.complete ? 'st.complete' : 'st.draft'))}</span></td>
           <td>${r.total ? `<span class="pill ${r.total === 'NG' ? 'ng' : 'ok'}">${r.total}</span>` : ''}</td>
