@@ -162,7 +162,13 @@ async function downloadFile(url, fileName, ext, pages) {
     throw err instanceof TypeError ? new Error(t('e.server')) : err;
   } finally { setBusy(false); }
 }
-const fmtDate = d => d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+// dd-MM-yyyy (a date value like 2026-10-19 or a timestamp), with HH:mm for a timestamp
+const dmy = s => { const m = String(s ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s ?? ''); };
+const fmtDate = d => {
+  if (!d) return '';
+  const x = new Date(d), p = n => String(n).padStart(2, '0');
+  return isNaN(x) ? String(d) : `${p(x.getDate())}-${p(x.getMonth() + 1)}-${x.getFullYear()} ${p(x.getHours())}:${p(x.getMinutes())}`;
+};
 
 // Date fields: the browser's date picker shows its own format, so each <input type="date"> keeps working as it is
 // (value = yyyy-mm-dd, native calendar) while its text is hidden and a DD-MM-YYYY label is shown over it.

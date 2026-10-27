@@ -12,6 +12,9 @@ const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
 // File name: OQC_<dd-mm-yyyy>.pdf (today)
 const pdfBase = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `OQC_${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`; };
 
+// Saved file name: "<Type> LotNo <LotNo> ddMMyyyy" (today) (now; no colons, they are not allowed in file names)
+const nowStamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}`; };
+
 // Read and check the request shared by the Excel and PDF downloads: { fileName, itemList, pages } (null = already answered)
 async function readExportRequest(req, res, session, ext) {
   if (!session) { sendJson(res, 401, { error: 'Not logged in' }); return null; }
@@ -76,9 +79,9 @@ async function handleRecordExport(req, res, session, id, kind) {
   try {
     const pool = await getPool();
     const rec = (await pool.request().input('id', sql.Int, id).query(
-      `SELECT LotNo, BoxNo, Data, UpdateDate, ${flag} AS printed FROM OqcRecord WHERE SysNo = @id`)).recordset[0];
+      `SELECT LotNo, BoxNo, [Type] AS RecType, Data, UpdateDate, ${flag} AS printed FROM OqcRecord WHERE SysNo = @id`)).recordset[0];
     if (!rec) return sendJson(res, 404, { error: 'This record no longer exists' });
-    const name = `OQC_${rec.LotNo}${rec.BoxNo ? '_' + rec.BoxNo : ''}`.replace(/[^\w.-]+/g, '_').slice(0, 80) + ext;
+    const name = `${String(rec.RecType ?? '').replace(/[^\w .-]+/g, '_')} LotNo ${String(rec.LotNo ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60)} ${nowStamp()}${ext}`;
     const type = isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     const file = recordFile(id, ext);
     // A stored file made before the templates or the builder last changed is made again, so template changes show up
