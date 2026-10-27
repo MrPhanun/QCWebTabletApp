@@ -50,7 +50,7 @@ function setCell(sheet, ref, value) {
   const isNum = typeof value === 'number' && Number.isFinite(value);
   // { text, size, font }: the text as a run with its own size, for a value that does not fit its cell (the cell style stays)
   const body = isNum ? `<v>${value}</v>`
-    : typeof value === 'object' ? `<is><r><rPr><sz val="${value.size}"/><rFont val="${xmlText(value.font)}"/></rPr><t xml:space="preserve">${xmlText(value.text)}</t></r></is>`
+    : typeof value === 'object' ? `<is><r><rPr><sz val="${value.size}"/><color rgb="FF000000"/><rFont val="${xmlText(value.font)}"/></rPr><t xml:space="preserve">${xmlText(value.text)}</t></r></is>`
     : `<is><t xml:space="preserve">${xmlText(value)}</t></is>`;
   const type = isNum ? '' : ' t="inlineStr"';
   const re = new RegExp(`<c r="${ref}"((?:\\s+[\\w:]+="[^"]*")*)\\s*(?:/>|>[\\s\\S]*?</c>)`);
@@ -141,12 +141,12 @@ function setSpec(sheet, side, row, spec, ctx) {
   const m = String(spec ?? '').match(SPEC_TOL);
   const [c1, c3] = side.spec, c2 = colName(colNum(c1) + 1);
   if (!m && ctx && String(spec ?? '') !== '') {
-    // plain SPEC text (30±5, Max10, (60)): middle left in its box
+    // plain SPEC text (30±5, Max10, (60)): middle center in its box
     const s = styleOf(sheet, `${c1}${row}`);
     if (s !== undefined) {
       const key = 'l' + s;
       ctx.cache = ctx.cache || {};
-      ctx.cache[key] ??= addXf(ctx, centerXf(xfList(ctx.styles)[+s]).replace('horizontal="center"', 'horizontal="left"'));
+      ctx.cache[key] ??= addXf(ctx, centerXf(xfList(ctx.styles)[+s]));
       sheet = useStyle(sheet, `${c1}${row}`, ctx.cache[key]);
     }
   }
