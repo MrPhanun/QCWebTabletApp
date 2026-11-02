@@ -219,10 +219,12 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
   sheet = equalizeLengthTables(sheet);
   const items = d.items || {};
-  // Page count at the top right ("1/2"), above the REF line's end
-  if (d.pageCount) set('AU1', { text: `${d.pageNo}/${d.pageCount}`, size: 11, font: 'Times New Roman' });
+  // Form reference, as on the paper form (the First Lot form keeps the template's own)
+  if (!textBoxes) set('AJ1', 'REF:  QC-RE-002   REV:02   Date: 01/04/2026');
+  // Page count at the top right ("1/6"), under the REF line
+  if (d.pageCount) set('AU2', { text: `${d.pageNo}/${d.pageCount}`, size: 11, font: 'Times New Roman' });
   // AT3:AV3 are three small unmerged cells: the date runs across them, in the same size as the LOT № (10)
-  if (d.checkDate) set('AT3', { text: dmy(d.checkDate), size: 10, font: 'Times New Roman' });
+  if (d.checkDate) set('AT3', { text: String(d.checkDate).replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1.$2.$3'), size: 10, font: 'Times New Roman' });
   // Info row
   set('A7', d.customer); set('I7', d.partNo); set('U7', d.lot);
   set('AB7', asNum(d.qty)); set('AI7', asNum(d.spot)); set('AP7', d.probability);
@@ -271,7 +273,7 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
       const r = FIRST_LEN_ROW + i;
       side.samples.forEach(([c1, c2]) => centerBox(c1, c2, r));
       if (!l) continue;
-      set(`${side.pos[0]}${r}`, exactNum(l.position));
+      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: 10, font: 'Cambria' } : '');   // same size as the samples
       sheet = setSpec(sheet, side, r, l.spec, ctx);
       side.samples.forEach(([c1], k) => set(`${c1}${r}`, exactNum((l.samples || [])[k])));
     }
@@ -328,7 +330,7 @@ function addMaterialLines(drawing, d, itemList = []) {
     let first = ROWS;
     while (first > 0 && !used.has(t * ROWS + first)) first--;   // first = number of rows up to the last used one
     if (first >= ROWS) return;
-    anchors.push(redLine(940 + t, `No more length ${t + 1}`, `${side.pos[0]}${FIRST_LEN_ROW + first}:${side.samples[4][1]}${FIRST_LEN_ROW + ROWS - 1}`));
+    anchors.push(redLine(940 + t, `No more length ${t + 1}`, `${side.samples[0][0]}${FIRST_LEN_ROW + first}:${side.samples[4][1]}${FIRST_LEN_ROW + ROWS - 1}`));
   });
   return anchors.length ? drawing.replace('</xdr:wsDr>', anchors.join('') + '</xdr:wsDr>') : drawing;
 }
