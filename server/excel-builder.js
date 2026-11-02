@@ -220,11 +220,17 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   sheet = equalizeLengthTables(sheet);
   const items = d.items || {};
   // Form reference, as on the paper form (the First Lot form keeps the template's own)
-  if (!textBoxes) set('AJ1', 'REF:  QC-RE-002   REV:02   Date: 01/04/2026');
+  // (it starts further left than the template's own cell: the Length Check columns are narrower, and the line would run past the page)
+  if (!textBoxes) { sheet = sheet.replace(/(<c r="AJ1"[^>]*?)(?:\/>|>[\s\S]*?<\/c>)/, (m, a) => a.replace(/\s+t="[^"]*"/, '') + '/>'); set('AF1', 'REF:  QC-RE-002   REV:02   Date: 01/04/2026'); sheet = useStyle(sheet, 'AF1', styleOf(sheet, 'AJ1')); }
   // Page count at the top right ("1/6"), under the REF line
   if (d.pageCount) set('AU2', { text: `${d.pageNo}/${d.pageCount}`, size: 11, font: 'Times New Roman' });
-  // AT3:AV3 are three small unmerged cells: the date runs across them, in the same size as the LOT № (10)
-  if (d.checkDate) set('AT3', { text: String(d.checkDate).replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1.$2.$3'), size: 10, font: 'Times New Roman' });
+  // The date is in the same size as the LOT № (10). The label takes AO3:AR3 and the date AS3:AV3 (the template's label box AO3:AS3 is too wide for the narrower columns)
+  if (d.checkDate) {
+    sheet = sheet.replace(/<mergeCell ref="AO3:AS3"\/>/, '').replace(/<mergeCells count="(\d+)">/, (m, n) => `<mergeCells count="${+n - 1}">`);
+    sheet = useStyle(addMerge(addMerge(sheet, 'AO3:AR3'), 'AS3:AV3'), 'AS3', styleOf(sheet, 'AT3'));
+    set('AO3', { text: 'ថ្ងៃត្រួតពិនិត្យ\n[CHECK DATE]', size: 7, font: 'Times New Roman' });
+    set('AS3', { text: String(d.checkDate).replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1.$2.$3'), size: 10, font: 'Times New Roman' });
+  }
   // Info row
   set('A7', d.customer); set('I7', d.partNo); set('U7', d.lot);
   set('AB7', asNum(d.qty)); set('AI7', asNum(d.spot)); set('AP7', d.probability);
