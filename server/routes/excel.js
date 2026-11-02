@@ -15,6 +15,9 @@ const pdfBase = () => { const d = new Date(), p = n => String(n).padStart(2, '0'
 // Saved file name: "<Type> LotNo <LotNo> ddMMyyyy" (today) (now; no colons, they are not allowed in file names)
 const nowStamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}`; };
 
+// File name of a record: "<Part No> <Qty>" from its first page ('' when it has no Part No)
+const partQtyName = page => [page && page.partNo, page && page.qty].map(x => String(x ?? '').trim().replace(/[^\w.-]+/g, '_')).filter(Boolean).join(' ').slice(0, 80);
+
 // Read and check the request shared by the Excel and PDF downloads: { fileName, itemList, pages } (null = already answered)
 async function readExportRequest(req, res, session, ext) {
   if (!session) { sendJson(res, 401, { error: 'Not logged in' }); return null; }
@@ -24,7 +27,7 @@ async function readExportRequest(req, res, session, ext) {
   const pages = Array.isArray(body.pages) ? body.pages : [];
   const itemList = Array.isArray(body.itemList) ? body.itemList.slice(0, 9).map(x => [String(x[0] ?? ''), String(x[1] ?? '')]) : [];
   if (!pages.length || pages.length > 50 || pages.some(p => !p || typeof p !== 'object')) { sendJson(res, 400, { error: 'Invalid request' }); return null; }
-  const name = (String(body.fileName || 'OQC').replace(/[^\w.-]+/g, '_').slice(0, 80) || 'OQC') + ext;
+  const name = ((pages[0].qty ? partQtyName(pages[0]) : '') || String(body.fileName || 'OQC').replace(/[^\w.-]+/g, '_').slice(0, 80) || 'OQC') + ext;
   return { pages, itemList, name };
 }
 
@@ -81,7 +84,9 @@ async function handleRecordExport(req, res, session, id, kind) {
     const rec = (await pool.request().input('id', sql.Int, id).query(
       `SELECT LotNo, BoxNo, [Type] AS RecType, Data, UpdateDate, ${flag} AS printed FROM OqcRecord WHERE SysNo = @id`)).recordset[0];
     if (!rec) return sendJson(res, 404, { error: 'This record no longer exists' });
-    const name = `${String(rec.RecType ?? '').replace(/[^\w .-]+/g, '_')} LotNo ${String(rec.LotNo ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60)} ${nowStamp()}${ext}`;
+    let first = null;
+    try { first = JSON.parse(rec.Data)[0]; } catch {}
+    const name = (partQtyName(first) || `${String(rec.RecType ?? '').replace(/[^\w .-]+/g, '_')} LotNo ${String(rec.LotNo ?? '').replace(/[^\w.-]+/g, '_').slice(0, 60)} ${nowStamp()}`) + ext;
     const type = isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     const file = recordFile(id, ext);
     // A stored file made before the templates or the builder last changed is made again, so template changes show up
