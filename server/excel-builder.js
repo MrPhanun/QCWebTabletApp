@@ -163,6 +163,8 @@ ${m[3]}`);
 // The two Length Check tables (left and right) get the same column widths: each part (position, SPEC, each sample) takes the average
 // of its two widths, shared out over that part's columns in proportion to what they were
 const POSITION_GROW = 1.35;
+// Length Position: the same size as the samples (10), smaller when the name is too long for its box so that all of it shows
+const positionSize = t => Math.max(6, Math.min(10, Math.floor(10 * 17 / t.length * 2) / 2));
 function equalizeLengthTables(sheet) {
   const m = sheet.match(/<cols>([\s\S]*?)<\/cols>/);
   if (!m) return sheet;
@@ -192,6 +194,9 @@ function equalizeLengthTables(sheet) {
     const grow = sum(pos) * (POSITION_GROW - 1), f = (sum(smp) - grow) / sum(smp);
     for (const i of pos) cols[i][1] = Math.round(cols[i][1] * POSITION_GROW * 1000) / 1000;
     for (const i of smp) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000;
+    // The five samples (and the OK under each) are the same width
+    const parts = side.samples.map(idx), target = parts.reduce((t, ix) => t + sum(ix), 0) / parts.length;
+    for (const ix of parts) { const g = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * g * 1000) / 1000; }
   }
   const out = cols.map((c, i) => c && `<col min="${i}" max="${i}" width="${c[1]}"${c[0]}/>`).filter(Boolean).join('');
   return sheet.replace(m[0], `<cols>${out}${(m[1].match(/<col\b[^>]*\bmin="\d{3,}"[^>]*\/>/g) || []).join('')}</cols>`);
@@ -279,14 +284,14 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
       const r = FIRST_LEN_ROW + i;
       side.samples.forEach(([c1, c2]) => centerBox(c1, c2, r));
       if (!l) continue;
-      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: 10, font: 'Cambria' } : '');   // same size as the samples
+      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: positionSize(String(l.position).trim()), font: 'Cambria' } : '');
       sheet = setSpec(sheet, side, r, l.spec, ctx);
       side.samples.forEach(([c1], k) => set(`${c1}${r}`, exactNum((l.samples || [])[k])));
     }
     // ④⑤ "/": the columns and rows stay as they are; the line is a shape over them (see addMaterialLines)
     // Result row: one result under each sample ① .. ⑤ (records saved before that have one result for the whole table)
     side.samples.forEach(([c1, c2]) => centerBox(c1, c2, RESULT_ROW));
-    if (Array.isArray(res)) side.samples.forEach(([c1], k) => set(`${c1}${RESULT_ROW}`, slash && k >= 3 ? '' : res[k] || ''));   // ④⑤ "/": the line crosses the Result row instead of a "/" text
+    if (Array.isArray(res)) side.samples.forEach(([c1], k) => set(`${c1}${RESULT_ROW}`, slash && k >= 3 || !res[k] ? '' : { text: String(res[k]), size: 9, font: 'Times New Roman' }));   // every result the same size   // ④⑤ "/": the line crosses the Result row instead of a "/" text
     else set(`${side.samples[0][0]}${RESULT_ROW}`, res);
   });
   // Footer: remarks, total determination, checked by, inspector
