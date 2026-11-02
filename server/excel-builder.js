@@ -162,6 +162,7 @@ ${m[3]}`);
 
 // The two Length Check tables (left and right) get the same column widths: each part (position, SPEC, each sample) takes the average
 // of its two widths, shared out over that part's columns in proportion to what they were
+const POSITION_GROW = 1.35;
 function equalizeLengthTables(sheet) {
   const m = sheet.match(/<cols>([\s\S]*?)<\/cols>/);
   if (!m) return sheet;
@@ -182,6 +183,15 @@ function equalizeLengthTables(sheet) {
     const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
     const target = (sum(li) + sum(ri)) / 2;
     for (const ix of [li, ri]) { const f = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
+  }
+  // Position gets more room (long names like "3(1-CN115R)"), the sample columns give up the same width so the table keeps its size
+  for (const side of [LEFT, RIGHT]) {
+    const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
+    const pos = idx(side.pos), smp = side.samples.flatMap(idx);
+    const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
+    const grow = sum(pos) * (POSITION_GROW - 1), f = (sum(smp) - grow) / sum(smp);
+    for (const i of pos) cols[i][1] = Math.round(cols[i][1] * POSITION_GROW * 1000) / 1000;
+    for (const i of smp) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000;
   }
   const out = cols.map((c, i) => c && `<col min="${i}" max="${i}" width="${c[1]}"${c[0]}/>`).filter(Boolean).join('');
   return sheet.replace(m[0], `<cols>${out}${(m[1].match(/<col\b[^>]*\bmin="\d{3,}"[^>]*\/>/g) || []).join('')}</cols>`);
@@ -209,8 +219,10 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
   sheet = equalizeLengthTables(sheet);
   const items = d.items || {};
-  // AT3:AV3 are three small unmerged cells: the date runs across them, a little smaller so that it fits
-  if (d.checkDate) set('AT3', { text: dmy(d.checkDate), size: 8, font: 'Times New Roman' });
+  // Page count at the top right ("1/2"), above the REF line's end
+  if (d.pageCount) set('AU1', { text: `${d.pageNo}/${d.pageCount}`, size: 11, font: 'Times New Roman' });
+  // AT3:AV3 are three small unmerged cells: the date runs across them, in the same size as the LOT № (10)
+  if (d.checkDate) set('AT3', { text: dmy(d.checkDate), size: 10, font: 'Times New Roman' });
   // Info row
   set('A7', d.customer); set('I7', d.partNo); set('U7', d.lot);
   set('AB7', asNum(d.qty)); set('AI7', asNum(d.spot)); set('AP7', d.probability);
@@ -309,6 +321,14 @@ function addMaterialLines(drawing, d, itemList = []) {
     const res = (d.lengthResults || [])[t];
     if (!(Array.isArray(res) && res[3] === '/' && res[4] === '/')) return;
     drawing = showRedLine(drawing, anchors, `LengthLine${t + 1}`, 920 + t, `Not used length ${t + 1}`, `${side.samples[3][0]}${FIRST_LEN_ROW}:${side.samples[4][1]}${RESULT_ROW}`);
+  });
+  // Length Check with no more length positions: one thin line over the empty rows at the end of each table
+  const used = new Set((d.lengths || []).map(l => Number(l.no)));
+  [LEFT, RIGHT].forEach((side, t) => {
+    let first = ROWS;
+    while (first > 0 && !used.has(t * ROWS + first)) first--;   // first = number of rows up to the last used one
+    if (first >= ROWS) return;
+    anchors.push(redLine(940 + t, `No more length ${t + 1}`, `${side.pos[0]}${FIRST_LEN_ROW + first}:${side.samples[4][1]}${FIRST_LEN_ROW + ROWS - 1}`));
   });
   return anchors.length ? drawing.replace('</xdr:wsDr>', anchors.join('') + '</xdr:wsDr>') : drawing;
 }
@@ -507,7 +527,7 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
     if (i > 0) Object.keys(MATERIAL).forEach(k => { items[materialKey(k)] = '/'; });
     const material = Object.fromEntries(Object.keys(MATERIAL).map(k =>
       [k, items[materialKey(k)] === '/' ? '/' : (d.material || {})[k] || '']));
-    return { ...d, items, material };
+    return { ...d, items, material, pageNo: i + 1, pageCount: pages.length };
   });
   // First Slot (the Part No's SPEC Type) uses the Spec template (form "First Lot"): same layout, but the material text is in text boxes
   if (kind === 'oqc' && pages[0].type === 'First Slot') {

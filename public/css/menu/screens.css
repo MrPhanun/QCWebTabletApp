@@ -105,9 +105,9 @@ table.perm-grid tr.me td.sticky { background: #ecfdf5; }
 .spec-editor [data-of] { background: none; border-color: transparent; color: var(--ink); cursor: default; }
 .spec-add-page { display: flex; justify-content: center; margin-top: 12px; }
 .spec-editor td.na { background: repeating-linear-gradient(135deg, #f6f8f7 0 6px, #eef2f0 6px 12px); }
-.spec-editor .oqc-len td.pos { width: 23%; }
+.spec-editor .oqc-len td.pos { width: 31%; }
 .spec-editor .oqc-len td.spc { width: 27%; }
-.spec-editor .oqc-len td.na:not([colspan]) { width: 8%; }
+.spec-editor .oqc-len td.na:not([colspan]) { width: 5%; }
 /* SPEC value with its tolerance written small beside it, + above -, e.g. 100 ⁺¹⁰₋₅ */
 .spec-editor .spec-tol { display: flex; align-items: center; gap: 2px; }
 .spec-editor .spec-tol > input { flex: 1; min-width: 34px; text-align: right; padding-left: 2px; padding-right: 2px; }
@@ -189,12 +189,12 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .oqc-len-wrap { overflow-x: auto; }
 .oqc-len { min-width: 400px; }
 .oqc-len td { padding: 3px 4px; }
-.oqc-len td.smp { width: 58px; }
+.oqc-len td.smp { width: 40px; }
 /* Length Position like the paper sheet: small bold text, left, wide enough for "23(7-CN1PU)" */
 /* (not the Result row, where cells 2-6 are the results of ① .. ⑤) */
-.oqc-len tr:not(.sec) td:nth-child(2) { width: 23%; }
-.oqc-len tr:not(.sec) td:nth-child(3) { width: 21%; }
-.oqc-len td.smp, .oqc-len td.smp-res { width: 9%; }
+.oqc-len tr:not(.sec) td:nth-child(2) { width: 31%; }
+.oqc-len tr:not(.sec) td:nth-child(3) { width: 19%; }
+.oqc-len td.smp, .oqc-len td.smp-res { width: 5.5%; }
 .oqc-len input[data-pos] { font-size: 11px; font-weight: 800; text-align: left; padding-left: 5px; }
 .oqc-len input.spec { font-size: 12px; padding-left: 1px; padding-right: 1px; letter-spacing: -.2px; }
 .oqc-len td.no { width: 26px; padding-left: 2px; padding-right: 2px; text-align: center; }
@@ -326,6 +326,7 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .choose-item:active { transform: scale(.985); }
 
 .flt-pdf { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+#spForm + .flt-pdf { margin-top: 14px; }
 .type-seg button[data-v="printed"][aria-pressed="true"] { background: var(--accent-1); color: #fff; }
 .type-seg button[data-v="draft"][aria-pressed="true"] { background: #d97706; color: #fff; }
 
