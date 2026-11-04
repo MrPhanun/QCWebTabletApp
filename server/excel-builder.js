@@ -341,6 +341,7 @@ function addMaterialLines(drawing, d, itemList = []) {
     let first = ROWS;
     while (first > 0 && !used.has(t * ROWS + first)) first--;   // first = number of rows up to the last used one
     if (first >= ROWS) return;
+    if (first === 0 && t > 0) return;   // the right table has no data at all: no line over it, only the left table's line
     anchors.push(redLine(940 + t, `No more length ${t + 1}`, `${side.samples[0][0]}${FIRST_LEN_ROW + first}:${side.samples[4][1]}${FIRST_LEN_ROW + ROWS - 1}`));
   });
   return anchors.length ? drawing.replace('</xdr:wsDr>', anchors.join('') + '</xdr:wsDr>') : drawing;
