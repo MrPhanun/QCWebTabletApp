@@ -194,10 +194,10 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 /* (not the Result row, where cells 2-6 are the results of ① .. ⑤) */
 .oqc-len tr:not(.sec) td:nth-child(2) { width: 31%; }
 .oqc-len tr:not(.sec) td:nth-child(3) { width: 19%; }
-.oqc-len td.smp, .oqc-len td.smp-res { width: 5.5%; }
+.oqc-len td.smp, .oqc-len td.smp-res { width: 6.5%; }
 .oqc-len input[data-pos] { font-size: 11px; font-weight: 800; text-align: left; padding-left: 5px; }
 .oqc-len input.spec { font-size: 12px; padding-left: 1px; padding-right: 1px; letter-spacing: -.2px; }
-.oqc-len td.no { width: 26px; padding-left: 2px; padding-right: 2px; text-align: center; }
+.oqc-len th.no, .oqc-len td.no { width: 10px; padding-left: 1px; padding-right: 1px; text-align: center; }
 .oqc-len tr:not(.sec) td:nth-child(2), .oqc-len tr:not(.sec) td:nth-child(3) { padding-left: 2px; padding-right: 2px; }
 /* ④⑤ not used: one diagonal line across the whole block (see slashUnused) */
 .oqc-len td.smp, .oqc-len td.smp-res { position: relative; }

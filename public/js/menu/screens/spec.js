@@ -17,7 +17,7 @@ function renderSpec(panel) {
   // Rows № from..from+10 of page p; inputs carry the stored LineNo (p * 22 + №). Lines past 200 can't be used.
   const lenTable = (p, from) => `<table class="oqc oqc-len">
       <thead>
-        <tr><th class="c" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
+        <tr><th class="c no" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
           <th rowspan="2">${bi('តំលៃប្រវែងកំនត់', 'SPEC')}</th><th class="c" colspan="5">Sample</th></tr>
         <tr>${OQC_CIRC.map(c => `<th class="c">${c}</th>`).join('')}</tr>
       </thead>

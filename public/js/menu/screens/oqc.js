@@ -11,7 +11,7 @@ function renderOQC(panel, opts = {}) {
 
   const lenTable = from => `<table class="oqc oqc-len">
       <thead>
-        <tr><th class="c" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
+        <tr><th class="c no" rowspan="2">№</th><th rowspan="2">${bi('ទីតាំងប្រវែង', 'Length Position')}</th>
           <th rowspan="2">${bi('តំលៃប្រវែងកំណត់', 'SPEC')}</th><th class="c" colspan="5">Sample</th></tr>
         <tr>${CIRC.map(c => `<th class="c">${c}</th>`).join('')}</tr>
       </thead>
@@ -129,32 +129,38 @@ function renderOQC(panel, opts = {}) {
   }
 
   // Samples outside SPEC turn red. Each sample column ① .. ⑤ has its own Result under the table: NG if any of its
-  // samples is out of SPEC, OK once one can be checked, blank otherwise; ④⑤ get "/" while they are struck out (not used)
+  // samples is out of SPEC, blank (not OK) if a required row was left empty, OK once every required row is filled
+  // and none is NG; ④⑤ get "/" while they are struck out (not used)
   function checkLength(table) {
     const cols = markLength(table);
     const sample = isSample(table);
     table.querySelectorAll('select.len-res').forEach((sel, k) =>
-      setRes(sel, sample && k >= SAMPLE_COLS ? '/' : cols[k].bad ? 'NG' : cols[k].checked ? 'OK' : ''));
+      setRes(sel, sample && k >= SAMPLE_COLS ? '/' : cols[k].bad ? 'NG' : cols[k].missing ? '' : cols[k].checked ? 'OK' : ''));
   }
   // Sample ticked: only ①②③ are measured and ④⑤ are "/". Normal / First Slot (not ticked): all five ①②③④⑤ must be filled.
   const SAMPLE_COLS = 3;
   const isSample = table => table.closest('form')?.dataset.sample === '1';
   const requiredSamples = table => isSample(table) ? SAMPLE_COLS : 5;
-  // Colour out-of-SPEC samples red; returns per sample column how many samples could be checked / were NG
+  // Colour out-of-SPEC and missing samples red; returns per sample column how many samples could be checked / were NG / were left empty
   function markLength(table) {
-    const cols = OQC_CIRC.map(() => ({ checked: 0, bad: 0 }));
+    const need = requiredSamples(table);
+    const cols = OQC_CIRC.map(() => ({ checked: 0, bad: 0, missing: 0 }));
     table.querySelectorAll('tbody tr:not(.sec)').forEach(tr => {
       const spec = parseRange(tr.querySelector('[data-range]').value) || parseSpec(tr.querySelector('.spec').value);
+      const hasSpec = !!tr.querySelector('[data-spec]').value.trim();
       tr.querySelectorAll('input.smp').forEach((inp, k) => {
         const v = inp.value.trim();
-        let ng = false;
+        let ng = false, missing = false;
         if (v !== '' && spec) {
           const n = Number(v);
           cols[k].checked++;
           ng = !Number.isFinite(n) || n < spec[0] - 1e-9 || n > spec[1] + 1e-9;
           if (ng) cols[k].bad++;
+        } else if (v === '' && hasSpec && k < need) {
+          missing = true;
+          cols[k].missing++;
         }
-        inp.classList.toggle('ng', ng);
+        inp.classList.toggle('ng', ng || missing);
       });
     });
     // Rows without a SPEC are not measured: show them as blank cells (no input boxes), like the paper form
