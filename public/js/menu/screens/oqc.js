@@ -487,8 +487,20 @@ function renderOQC(panel, opts = {}) {
     $('oqcDelPage').hidden = n === 1;
     markMaterial();
   }
+  // Page 1 is the master for the header (check date, customer, part, lot, quantity, spot check, probability) and the Inspection Point results:
+  // later pages made before those were entered get them copied over.
+  function syncHead() {
+    if (cur !== 0 || pages.length < 2) return;
+    const first = snapshot(), all = fields($('oqcForm'));
+    const idx = all.map((c, i) => (c.id === 'oqcDate' || c.closest('.oqc-info') || (c.matches('select.res') && !c.matches('.mat-res') && !c.closest('.oqc-len'))) && c.id !== 'oqcLotPick' ? i : -1).filter(i => i >= 0);
+    for (let p = 1; p < pages.length; p++) {
+      const s = pages[p] = { vals: [...pages[p].vals], prob: first.prob, sample: pages[p].sample };
+      idx.forEach(i => { s.vals[i] = first.vals[i]; });
+    }
+  }
   function goTo(i) {
     pages[cur] = snapshot();
+    syncHead();
     cur = i;
     applySnapshot($('oqcForm'), pages[cur]);
     prob = pages[cur].prob;
@@ -501,6 +513,7 @@ function renderOQC(panel, opts = {}) {
     // New page: copy this page, then empty its Length Check (Position, SPEC, samples, results)
     pages[cur] = snapshot();
     pages.push(withoutLengths(pages[cur]));
+    syncHead();
     goTo(pages.length - 1);
     markDirty();
     updateTotal();
