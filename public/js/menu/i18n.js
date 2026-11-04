@@ -22,7 +22,7 @@ const STR = {
   'u.errId': ['ID must be 1 to 10 letters, digits, dot, dash or underscore', 'ID ត្រូវមាន 1 ដល់ 10 តួអក្សរ (អក្សរ លេខ . - _)'],
   'u.errName': ['Enter a username', 'សូមបញ្ចូលឈ្មោះអ្នកប្រើ'], 'u.errPass': ['Enter a password', 'សូមបញ្ចូលពាក្យសម្ងាត់'],
   'e.noPerm': ['You do not have permission to do this', 'អ្នកមិនមានសិទ្ធិធ្វើការនេះទេ'],
-  'p.view': ['View', 'មើល'], 'p.add': ['Add', 'បន្ថែម'], 'p.edit': ['Edit', 'កែប្រែ'], 'p.delete': ['Delete', 'លុប'], 'p.excel': ['Excel', 'Excel'],
+  'p.view': ['View', 'មើល'], 'p.add': ['Add', 'បន្ថែម'], 'p.edit': ['Edit', 'កែប្រែ'], 'p.delete': ['Delete', 'លុប'], 'p.excel': ['Excel', 'Excel'], 'p.special': ['Edit (Special)', 'កែប្រែពិសេស'],
   'r.search': ['Search user…', 'ស្វែងរកអ្នកប្រើ…'], 'r.user': ['User', 'អ្នកប្រើ'],
   'r.default': ['Default', 'លំនាំដើម'], 'r.custom': ['Custom', 'កំណត់ផ្ទាល់'], 'r.all': ['Tick / untick for everyone in the list', 'ធីក / ដោះធីក សម្រាប់អ្នកទាំងអស់ក្នុងបញ្ជី'],
   'r.changes': ['{n} unsaved change{s}', 'មានការកែប្រែ {n} មិនទាន់រក្សាទុក'], 'r.saved': ['Permissions saved', 'បានរក្សាទុកសិទ្ធិ'],
