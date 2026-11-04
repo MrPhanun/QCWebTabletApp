@@ -54,7 +54,8 @@ async function saveRecord(id, r, userId) {
     .query(`SET XACT_ABORT ON;
       DECLARE @dup int = NULL, @rc int = 0, @newId int = NULL, @reset bit = 0;
       BEGIN TRAN;
-      SELECT TOP 1 @dup = SysNo FROM OqcRecord WITH (UPDLOCK, HOLDLOCK) WHERE DelStatus = 'Active' AND LotNo = @lot AND BoxNo = @box AND SysNo <> @id;
+      SELECT TOP 1 @dup = SysNo FROM OqcRecord WITH (UPDLOCK, HOLDLOCK) WHERE DelStatus = 'Active' AND Customer = @customer
+        AND ISNULL(ShipmentDate, '1900-01-01') = @shipDate AND ISNULL(Qty, -1) = ISNULL(@qty, -1) AND SysNo <> @id;
       IF @dup IS NULL
       BEGIN
         IF @id = 0
@@ -153,7 +154,7 @@ async function handleOqcRecords(req, res, session, id) {
       const r = validateRecord(body);
       if (r.error) return sendJson(res, 400, r);
       const out = await saveRecord(id || 0, r, session.id);
-      if (out.dup != null) return sendJson(res, 409, { error: `Lot ${r.lot}${r.box ? `, Box ${r.box}` : ''} is already saved`, existingId: out.dup });
+      if (out.dup != null) return sendJson(res, 409, { error: `A record with the same Customer, Shipment Date and Qty is already saved`, existingId: out.dup });
       if (!out.rc) return sendJson(res, 404, { error: 'This record no longer exists' });
       if (out.reset) removeRecordFile(out.newId, '.pdf');
       return sendJson(res, id ? 200 : 201, { id: out.newId });

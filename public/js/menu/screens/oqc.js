@@ -488,7 +488,7 @@ function renderOQC(panel, opts = {}) {
     panel.querySelector('.oqc-sheet-page').textContent = `Page ${cur + 1} / ${n}`;
     $('oqcPrev').disabled = cur === 0;
     $('oqcNext').innerHTML = cur === n - 1 ? ico('filePlus') + T('b.addPage') : T('b.nextPage') + ' ' + svg('chev');
-    $('oqcDelPage').hidden = n === 1;
+    $('oqcDelPage').hidden = n === 1 || !canSpecial;   // Remove page is part of Special edit
     markMaterial();
   }
   // Page 1 is the master for the header (check date, customer, part, lot, quantity, spot check, probability) and the Inspection Point results:
