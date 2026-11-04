@@ -7,7 +7,7 @@ const isQC = dept => String(dept || '').trim().toUpperCase() === 'QC';
 const PERMS = [
   'sampling.view', 'sampling.add', 'sampling.edit', 'sampling.delete',
   'spec.view', 'spec.add', 'spec.edit', 'spec.delete', 'spec.excel',
-  'daily.view', 'daily.add', 'daily.edit', 'daily.delete', 'daily.excel',
+  'daily.view', 'daily.add', 'daily.edit', 'daily.delete', 'daily.excel', 'daily.special',
   'users.view', 'users.add', 'users.edit', 'users.delete',
   'roles.view', 'roles.edit'
 ];
@@ -15,7 +15,7 @@ const PERMS = [
 // Admin role manages users and permissions (same as before permissions existed)
 function defaultPerms(role, dept) {
   const p = ['sampling.view', 'spec.view', 'spec.excel', 'daily.view', 'daily.excel'];
-  if (isQC(dept)) p.push('sampling.add', 'sampling.edit', 'sampling.delete', 'spec.add', 'spec.edit', 'spec.delete', 'daily.add', 'daily.edit', 'daily.delete');
+  if (isQC(dept)) p.push('sampling.add', 'sampling.edit', 'sampling.delete', 'spec.add', 'spec.edit', 'spec.delete', 'daily.add', 'daily.edit', 'daily.delete', 'daily.special');
   if (role === 'Admin') p.push('users.view', 'users.add', 'users.edit', 'users.delete', 'roles.view', 'roles.edit');
   return p;
 }

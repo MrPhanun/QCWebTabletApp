@@ -103,6 +103,10 @@ function renderOQC(panel, opts = {}) {
     </form>`;
 
   enhanceDates(panel);
+  // Special edit: only users with 'daily.special' can type in Wire / Terminal / Housing / Other, Length Position and SPEC
+  // (filling them from the scanned label / SPEC master still works for everyone)
+  const canSpecial = can('daily.special');
+  if (!canSpecial) panel.querySelectorAll('[data-pos], [data-spec], .oqc-cols textarea[id^="oqc-"]').forEach(el => { el.readOnly = true; el.title = t('e.noPerm'); });
   const $ = id => panel.querySelector('#' + id);
   const msg = (text, kind = 'err') => { $('oqcMsg').textContent = text; $('oqcMsg').className = 'msg ' + kind; };
   const setRes = (sel, v) => { sel.value = v; sel.dataset.v = v; };
@@ -219,7 +223,7 @@ function renderOQC(panel, opts = {}) {
       sel.disabled = cur > 0;
       const ta = sel.closest('tr').querySelector('textarea');
       ta.classList.toggle('slashed', sel.value === '/');
-      ta.readOnly = sel.value === '/';
+      ta.readOnly = sel.value === '/' || !canSpecial;
     });
   }
   $('oqcForm').addEventListener('change', e => { if (e.target.matches('select.mat-res')) markMaterial(); });
