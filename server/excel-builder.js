@@ -236,7 +236,7 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const items = d.items || {};
   // Form reference, as on the paper form (the First Lot form keeps the template's own)
   // (it starts further left than the template's own cell: the Length Check columns are narrower, and the line would run past the page)
-  if (!textBoxes) { sheet = sheet.replace(/(<c r="AJ1"[^>]*?)(?:\/>|>[\s\S]*?<\/c>)/, (m, a) => a.replace(/\s+t="[^"]*"/, '') + '/>'); set('AF1', 'REF:  QC-RE-002   REV:02   Date: 01/04/2026'); sheet = useStyle(sheet, 'AF1', styleOf(sheet, 'AJ1')); }
+  if (!textBoxes) { sheet = sheet.replace(/(<c r="AJ1"[^>]*?)(?:\/>|>[\s\S]*?<\/c>)/, (m, a) => a.replace(/\s+t="[^"]*"/, '') + '/>'); set('AF1', 'REF:  QC-RE-002   REV:03   Date: 02/11/2026'); sheet = useStyle(sheet, 'AF1', styleOf(sheet, 'AJ1')); }
   // Page count at the top right ("1/6"), under the REF line
   if (d.pageCount) set('AU2', { text: `${d.pageNo}/${d.pageCount}`, size: 11, font: 'Times New Roman' });
   // The date is in the same size as the LOT № (10). The label takes AO3:AR3 and the date AS3:AV3 (the template's label box AO3:AS3 is too wide for the narrower columns)
