@@ -162,6 +162,8 @@ async function handleOqcRecords(req, res, session, id) {
     sendJson(res, 405, { error: 'Method not allowed' });
   } catch (err) {
     console.error('OQC record error:', err.message);
+    // Unique index on Lot + Box (active records): this label is already saved, perhaps by another user
+    if (err.number === 2601 || err.number === 2627) return sendJson(res, 409, { error: 'A record for this Lot № and Box is already saved — search it in Search Draft / Save' });
     sendJson(res, 500, { error: 'Database error' });
   }
 }
