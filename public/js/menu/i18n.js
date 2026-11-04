@@ -199,7 +199,6 @@ const SERVER_KM = [
   [/^This (range|item|record) no longer exists$/, 'ទិន្នន័យនេះលែងមានទៀតហើយ'],
   [/^Lot № is required to save.*$/, 'ត្រូវការ Lot № ដើម្បីរក្សាទុក — សូមស្កេនស្លាក ឬវាយ Lot №'],
   [/^Lot (.+?)(, Box .+)? is already saved$/, 'Lot $1$2 បានរក្សាទុករួចហើយ'],
-  [/^A record for this Lot № and Box is already saved — search it in Search Draft \/ Save$/, 'កំណត់ត្រាសម្រាប់ Lot № និង Box នេះ បានរក្សាទុករួចហើយ — សូមស្វែងរកក្នុង Search Draft / Save'],
   [/^A record with the same Customer, Shipment Date and Qty is already saved$/, 'កំណត់ត្រាដែលមាន Customer, Shipment Date និង Qty ដូចគ្នា បានរក្សាទុករួចហើយ'],
   [/^You do not have permission to do this$/, 'អ្នកមិនមានសិទ្ធិធ្វើការនេះទេ'],
   [/^You cannot remove your own Roles & Permissions access$/, 'អ្នកមិនអាចដកសិទ្ធិ តួនាទី និងសិទ្ធិ ពីខ្លួនឯងបានទេ'],
