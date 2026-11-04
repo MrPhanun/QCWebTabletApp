@@ -124,13 +124,18 @@ async function handleOqcRecords(req, res, session, id) {
       const customer = String(q.get('customer') || '').trim().slice(0, 200);
       const status = q.get('status') === 'deleted' ? 'Deleted' : 'Active';   // Delete only sets DelStatus
       const day = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !isNaN(Date.parse(v)) ? v : null;
+      const from = day(q.get('from')), to = day(q.get('to'));
+      // No search condition at all (first open of the screen): show only what was registered today, not every record ever saved
+      const regToday = !text && !from && !to && !type && !customer && pdf === null;
       const { recordset } = await pool.request().input('text', sql.NVarChar(100), text).input('like', sql.NVarChar(210), like)
-        .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('pdf', sql.Bit, pdf).input('status', sql.VarChar(10), status).input('from', sql.Date, day(q.get('from'))).input('to', sql.Date, day(q.get('to')))
+        .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('pdf', sql.Bit, pdf).input('status', sql.VarChar(10), status)
+        .input('from', sql.Date, from).input('to', sql.Date, to).input('regToday', sql.Bit, regToday)
         .query(`SELECT TOP 200 ${REC_COLS} FROM OqcRecord
           WHERE DelStatus = @status AND (@text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
              OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\')
             AND (@type = '' OR [Type] = @type) AND (@customer = '' OR Customer = @customer) AND (@pdf IS NULL OR PdfPrinted = @pdf)
             AND (@from IS NULL OR ShipmentDate >= @from) AND (@to IS NULL OR ShipmentDate <= @to)
+            AND (@regToday = 0 OR CAST(RegDate AS DATE) = CAST(GETDATE() AS DATE))
           ORDER BY ShipmentDate DESC, UpdateDate DESC`);
       return sendJson(res, 200, recordset);
     }

@@ -198,6 +198,16 @@ function equalizeLengthTables(sheet) {
     const parts = side.samples.map(idx), target = parts.reduce((t, ix) => t + sum(ix), 0) / parts.length;
     for (const ix of parts) { const g = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * g * 1000) / 1000; }
   }
+  // The Result box of 1) Material check (AC:AE) and of 3) Inspection point (AT:AV, the same columns as sample ⑤)
+  // sit above this table but share its columns: match their width too (this can throw off their match with the
+  // position/sample groups above, since AC:AE is also part of RIGHT.pos and AT:AV is also RIGHT.samples[4])
+  {
+    const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
+    const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
+    const matRes = idx(['AC', 'AE']), itemRes = idx(RIGHT.samples[4]);
+    const target = (sum(matRes) + sum(itemRes)) / 2;
+    for (const ix of [matRes, itemRes]) { const f = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
+  }
   const out = cols.map((c, i) => c && `<col min="${i}" max="${i}" width="${c[1]}"${c[0]}/>`).filter(Boolean).join('');
   return sheet.replace(m[0], `<cols>${out}${(m[1].match(/<col\b[^>]*\bmin="\d{3,}"[^>]*\/>/g) || []).join('')}</cols>`);
 }
