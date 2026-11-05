@@ -3,7 +3,7 @@ const { sendJson, readJson } = require('../http');
 const { removeRecordFiles, removeRecordFile } = require('../record-files');
 
 // ---- Saved OQC records (OqcRecord): one per label (LotNo + BoxNo), all pages in Data as JSON ----
-const REC_COLS = `SysNo AS id, LotNo AS lot, BoxNo AS box, ItemCode AS itemCode, PartNo AS partNo, [Type] AS type, Customer AS customer,
+const REC_COLS = `SysNo AS id, Pos AS pos, LotNo AS lot, BoxNo AS box, ItemCode AS itemCode, PartNo AS partNo, [Type] AS type, Customer AS customer,
   CONVERT(varchar(10), CheckDate, 23) AS checkDate, CONVERT(varchar(10), ShipmentDate, 23) AS shipDate, Qty AS qty, ExcelPrinted AS excelPrinted, PdfPrinted AS pdfPrinted, Probability AS probability, Total AS total,
   Inspector AS inspector, CheckedBy AS checkedBy, PageCount AS pageCount, Complete AS complete,
   RegBy AS regBy, RegDate AS regDate, UpdateBy AS updateBy, UpdateDate AS updateDate`;
@@ -16,7 +16,7 @@ function validateRecord(b) {
   };
   try {
     const r = {
-      lot: str(b.lot, 50, 'Lot №'), box: str(b.box, 20, 'Box'), itemCode: str(b.itemCode, 50, 'Item Code'),
+      pos: str(b.pos, 50, 'POS'), lot: str(b.lot, 50, 'Lot №'), box: str(b.box, 20, 'Box'), itemCode: str(b.itemCode, 50, 'Item Code'),
       partNo: str(b.partNo, 100, 'Part №'), customer: str(b.customer, 200, 'Customer'),
       probability: str(b.probability, 10, 'Probability'), total: str(b.total, 2, 'Total'),
       inspector: str(b.inspector, 80, 'Inspector'), checkedBy: str(b.checkedBy, 80, 'Checked by'),
@@ -44,7 +44,7 @@ function validateRecord(b) {
 async function saveRecord(id, r, userId) {
   const pool = await getPool();
   const result = await pool.request()
-    .input('id', sql.Int, id).input('lot', sql.VarChar(50), r.lot).input('box', sql.VarChar(20), r.box)
+    .input('id', sql.Int, id).input('pos', sql.VarChar(50), r.pos).input('lot', sql.VarChar(50), r.lot).input('box', sql.VarChar(20), r.box)
     .input('itemCode', sql.VarChar(50), r.itemCode).input('partNo', sql.NVarChar(100), r.partNo)
     .input('customer', sql.NVarChar(200), r.customer).input('checkDate', sql.Date, r.checkDate).input('shipDate', sql.Date, r.shipDate)
     .input('qty', sql.Int, r.qty).input('type', sql.VarChar(20), r.type).input('probability', sql.VarChar(10), r.probability).input('total', sql.VarChar(2), r.total)
@@ -60,20 +60,20 @@ async function saveRecord(id, r, userId) {
       BEGIN
         IF @id = 0
         BEGIN
-          INSERT INTO OqcRecord (LotNo, BoxNo, ItemCode, PartNo, [Type], Customer, CheckDate, ShipmentDate, Qty, Probability, Total, Inspector, CheckedBy,
+          INSERT INTO OqcRecord (Pos, LotNo, BoxNo, ItemCode, PartNo, [Type], Customer, CheckDate, ShipmentDate, Qty, Probability, Total, Inspector, CheckedBy,
                                  PageCount, Complete, Data, RegBy, UpdateBy)
-          VALUES (@lot, @box, @itemCode, @partNo, @type, @customer, @checkDate, @shipDate, @qty, @probability, @total, @inspector, @checkedBy,
+          VALUES (@pos, @lot, @box, @itemCode, @partNo, @type, @customer, @checkDate, @shipDate, @qty, @probability, @total, @inspector, @checkedBy,
                   @pageCount, @complete, @data, @user, @user);
           SET @rc = @@ROWCOUNT; SET @newId = SCOPE_IDENTITY();
         END
         ELSE
         BEGIN
           -- Excel status is kept as is (a Printed record stays Printed); a revised record goes back to Draft for PDF only
-          IF NOT EXISTS (SELECT 1 FROM OqcRecord WHERE SysNo = @id AND LotNo = @lot AND BoxNo = @box AND PartNo = @partNo
+          IF NOT EXISTS (SELECT 1 FROM OqcRecord WHERE SysNo = @id AND Pos = @pos AND LotNo = @lot AND BoxNo = @box AND PartNo = @partNo
               AND ISNULL(ShipmentDate, '1900-01-01') = @shipDate AND ISNULL(Qty, -1) = ISNULL(@qty, -1)
               AND Complete = @complete AND Data = @data COLLATE Latin1_General_BIN2)
             SET @reset = 1;
-          UPDATE OqcRecord SET LotNo=@lot, BoxNo=@box, ItemCode=@itemCode, PartNo=@partNo, [Type]=@type, Customer=@customer, CheckDate=@checkDate, ShipmentDate=@shipDate,
+          UPDATE OqcRecord SET Pos=@pos, LotNo=@lot, BoxNo=@box, ItemCode=@itemCode, PartNo=@partNo, [Type]=@type, Customer=@customer, CheckDate=@checkDate, ShipmentDate=@shipDate,
             Qty=@qty,
             PdfPrinted = CASE WHEN @reset = 1 THEN 0 ELSE PdfPrinted END, Probability=@probability, Total=@total, Inspector=@inspector, CheckedBy=@checkedBy, PageCount=@pageCount,
             Complete=@complete, Data=@data, UpdateBy=@user, UpdateDate=GETDATE()
@@ -115,7 +115,7 @@ async function handleOqcRecords(req, res, session, id) {
       if (q.has('lot')) {
         const { recordset } = await pool.request().input('lot', sql.VarChar(50), String(q.get('lot')).trim().slice(0, 50))
           .input('box', sql.VarChar(20), String(q.get('box') || '').trim().slice(0, 20))
-          .query(`SELECT ${REC_COLS} FROM OqcRecord WHERE DelStatus = 'Active' AND LotNo = @lot AND BoxNo = @box`);
+          .query(`SELECT ${REC_COLS} FROM OqcRecord WHERE DelStatus = 'Active' AND Pos = @lot AND BoxNo = @box`);
         return sendJson(res, 200, recordset);
       }
       const text = String(q.get('q') || '').trim().slice(0, 100);
@@ -132,7 +132,7 @@ async function handleOqcRecords(req, res, session, id) {
         .input('type', sql.VarChar(20), type).input('customer', sql.NVarChar(200), customer).input('pdf', sql.Bit, pdf).input('status', sql.VarChar(10), status)
         .input('from', sql.Date, from).input('to', sql.Date, to).input('regToday', sql.Bit, regToday)
         .query(`SELECT TOP 200 ${REC_COLS} FROM OqcRecord
-          WHERE DelStatus = @status AND (@text = '' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
+          WHERE DelStatus = @status AND (@text = '' OR Pos LIKE @like ESCAPE '\\' OR LotNo LIKE @like ESCAPE '\\' OR BoxNo LIKE @like ESCAPE '\\' OR ItemCode LIKE @like ESCAPE '\\'
              OR PartNo LIKE @like ESCAPE '\\' OR Customer LIKE @like ESCAPE '\\' OR Inspector LIKE @like ESCAPE '\\')
             AND (@type = '' OR [Type] = @type) AND (@customer = '' OR Customer = @customer) AND (@pdf IS NULL OR PdfPrinted = @pdf)
             AND (@from IS NULL OR ShipmentDate >= @from) AND (@to IS NULL OR ShipmentDate <= @to)

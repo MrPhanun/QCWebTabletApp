@@ -39,7 +39,7 @@ function renderDraft(panel) {
       <div class="msg" id="drMsg" role="status"></div>
     </div>
     <div class="table-wrap"><table class="data frz">
-      <thead><tr>${['h.lot', 'h.itemCode', 'h.partNo', 'h.type', 'h.customer', 'h.checkDate', 'h.shipDate', 'h.shipQty', 'h.pages', 'h.status', 'h.total', 'h.pdfStatus', 'h.lastSaved']
+      <thead><tr>${['h.pos', 'h.shipDate', 'h.itemCode', 'h.partNo', 'h.type', 'h.customer', 'h.checkDate', 'h.lot', 'h.box', 'h.shipQty', 'h.pages', 'h.status', 'h.total', 'h.pdfStatus', 'h.lastSaved']
         .map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
       <tbody id="drBody"></tbody>
     </table></div>`;
@@ -71,9 +71,9 @@ function renderDraft(panel) {
       $('drCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
       const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drType').dataset.value || $('drCust').value || $('drPdf').dataset.value;
       $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}"${isDeleted ? ' class="deleted"' : ''}>
-          <td class="num">${s2(r.lot)}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
+          <td class="num key">${s2(r.pos)}</td><td class="key">${s2(dmy(r.shipDate))}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
           <td>${typePill(r.type)}</td>
-          <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(dmy(r.checkDate))}</td><td>${s2(dmy(r.shipDate))}</td>
+          <td class="txt" title="${s2(r.customer)}">${s2(r.customer)}</td><td>${s2(dmy(r.checkDate))}</td><td class="num key">${s2(r.lot)}</td><td class="num key">${s2(r.box)}</td>
           <td class="num">${r.qty == null || r.qty === '' || isNaN(r.qty) ? s2(r.qty ?? '') : Number(r.qty).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
           <td class="num">${r.pageCount}</td>
           <td><span class="pill ${r.complete ? 'done' : 'draft'}">${esc(t(r.complete ? 'st.complete' : 'st.draft'))}</span></td>
@@ -83,7 +83,7 @@ function renderDraft(panel) {
           <td>${isDeleted ? `<span class="pill draft">${esc(t('st.deleted'))}</span>` : `<div class="row-actions"><button class="icon-btn" data-open="${r.id}">${ico('folderOpen')}${T('b.open')}</button>${canExcel
             ? `<button class="icon-btn" data-excel="${r.id}">${ico('excel')}${T('b.excel')}</button><button class="icon-btn" data-pdf="${r.id}">${ico('printer')}${T('b.pdf')}</button>` : ''}${can('daily.delete')
             ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div>`}</td>
-        </tr>`).join('') || `<tr><td colspan="14" class="empty-row">${esc(t(filtered ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
+        </tr>`).join('') || `<tr><td colspan="16" class="empty-row">${esc(t(filtered ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
     } catch (err) { msg(err.message); }
   }
 

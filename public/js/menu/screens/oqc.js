@@ -298,7 +298,7 @@ function renderOQC(panel, opts = {}) {
       let label = null, labelErr = '';
       try { label = await api('GET', `/api/oqc/label?lot=${encodeURIComponent(lot)}&item=${encodeURIComponent(item)}&box=${encodeURIComponent(box)}`); }
       catch (err) { labelErr = err.status === 404 ? t('o.labelMissing', { lot, item, box }) : err.message; }
-      rec.box = box; rec.itemCode = item;
+      rec.box = box; rec.itemCode = item; rec.pos = lot;   // POS = the label's Lot No
       $('oqcCustomer').value = '';
       $('oqcPart').value = label ? label.partNo : '';
       $('oqcLot').value = '';   // Lot № is a date (dd-mm-yyyy) typed or picked by hand
@@ -721,7 +721,7 @@ function renderOQC(panel, opts = {}) {
     const totals = named.map(n => n.total);
     const body = {
       shipDate: $('oqcShip').value,
-      lot: h.lot, box: rec.box, itemCode: rec.itemCode, partNo: h.partNo, customer: h.customer, checkDate: h.checkDate, qty: h.qty,
+      pos: rec.pos || '', lot: h.lot, box: rec.box, itemCode: rec.itemCode, partNo: h.partNo, customer: h.customer, checkDate: h.checkDate, qty: h.qty,
       probability: h.probability, type: h.sample ? 'Sample' : formType === 'First Slot' ? 'First Slot' : 'Normal', inspector: h.inspector, checkedBy: h.checkedBy,
       total: totals.includes('NG') ? 'NG' : totals.length && totals.every(t => t === 'OK') ? 'OK' : '',
       complete: pages.every(pageComplete), pages: named
@@ -752,7 +752,7 @@ function renderOQC(panel, opts = {}) {
     cur = 0;
     applySnapshot($('oqcForm'), pages[0]);
     prob = pages[0].prob;
-    rec = { id: r.id, box: r.box, itemCode: r.itemCode };
+    rec = { id: r.id, box: r.box, itemCode: r.itemCode, pos: r.pos };
     $('oqcShip').value = r.shipDate || '';
     dirty = false;
     clearMissing();

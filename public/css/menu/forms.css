@@ -75,3 +75,4 @@ table.data .row-actions .del:hover { border-color: #dc2626; color: #b91c1c; }
   .form-grid .fld-level, .form-actions { grid-column: 1 / -1; }
   .form-actions .btn-primary { flex: 1; }
 }
+table.data td.key { font-weight: 700; color: #000; }
