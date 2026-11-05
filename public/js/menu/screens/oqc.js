@@ -498,7 +498,10 @@ function renderOQC(panel, opts = {}) {
     $('oqcPageInfo').textContent = t('pg', { n: cur + 1, total: n });
     panel.querySelector('.oqc-sheet-page').textContent = `Page ${cur + 1} / ${n}`;
     $('oqcPrev').disabled = cur === 0;
-    $('oqcNext').innerHTML = cur === n - 1 ? ico('filePlus') + T('b.addPage') : T('b.nextPage') + ' ' + svg('chev');
+    const isAdd = cur === n - 1;   // on the last page, this button adds one instead of moving forward
+    $('oqcNext').innerHTML = isAdd ? ico('filePlus') + T('b.addPage') : T('b.nextPage') + ' ' + svg('chev');
+    $('oqcNext').disabled = isAdd && !canSpecial;   // Add page is part of Special edit
+    $('oqcNext').title = isAdd && !canSpecial ? t('e.noPerm') : '';
     $('oqcDelPage').hidden = n === 1 || !canSpecial;   // Remove page is part of Special edit
     markMaterial();
   }
@@ -525,6 +528,7 @@ function renderOQC(panel, opts = {}) {
   $('oqcPrev').onclick = () => { if (cur > 0) goTo(cur - 1); };
   $('oqcNext').onclick = () => {
     if (cur < pages.length - 1) return goTo(cur + 1);
+    if (!canSpecial) return msg(t('e.noPerm'));
     // New page: copy this page, then empty its Length Check (Position, SPEC, samples, results)
     pages[cur] = snapshot();
     pages.push(withoutLengths(pages[cur]));
