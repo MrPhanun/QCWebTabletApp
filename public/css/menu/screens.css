@@ -216,6 +216,15 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .oqc-sec-title { font-weight: 700; margin-bottom: 6px; }
 .oqc-sec-title .km, .oqc-sec-title .en { display: inline; }
 .oqc-foot td { vertical-align: top; }
+/* First Lot: "Total Determination" is always Approved (no OK/NG dropdown), with a note the inspector can write by hand */
+.total-approved {
+  display: none; flex-direction: column; min-height: 32px; padding: 4px 6px; border: 1.5px solid #34d399; border-radius: 8px;
+  background: #d1fae5; color: #065f46; font-weight: 800; text-align: center; align-items: center; justify-content: center;
+}
+.total-note { display: none; margin-top: 6px; }
+#oqcForm[data-form="first"] #oqcTotal { display: none; }
+#oqcForm[data-form="first"] .total-approved { display: flex; }
+#oqcForm[data-form="first"] .total-note { display: block; }
 @media (max-width: 1100px) {
   .oqc-cols { grid-template-columns: minmax(0, 1fr); }
 }

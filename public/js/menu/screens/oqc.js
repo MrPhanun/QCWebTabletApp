@@ -95,7 +95,9 @@ function renderOQC(panel, opts = {}) {
           <th class="c">${bi('អ្នកត្រួតពិនិត្យ', 'Inspector')}</th>
         </tr>
         <tr>
-          <td><select class="res" id="oqcTotal" aria-label="Total determination"><option value=""></option><option>OK</option><option>NG</option></select></td>
+          <td><select class="res" id="oqcTotal" aria-label="Total determination"><option value=""></option><option>OK</option><option>NG</option></select>
+            <div class="total-approved">${bi('អនុម័ត្ត', 'Approved')}</div>
+            <input id="oqcTotalNote" class="total-note" aria-label="Total determination note" ${P('ph.totalNote')}></td>
           <td><input id="oqcChecked" class="badge-in" aria-label="Checked by" ${P('ph.badge')}></td>
           <td><input id="oqcInspector" class="badge-in" aria-label="Inspector" ${P('ph.badge')} value="${esc(String((currentUser && currentUser.username) || ''))}"></td>
         </tr>
@@ -199,8 +201,10 @@ function renderOQC(panel, opts = {}) {
     });
   }
 
-  // Total Determination: NG if any item is NG, OK once something is OK and nothing is NG
+  // Total Determination: NG if any item is NG, OK once something is OK and nothing is NG.
+  // First Lot: always "Approved" (the dropdown is hidden), the inspector can add a note by hand instead.
   function updateTotal() {
+    if ($('oqcForm').dataset.form === 'first') { setRes($('oqcTotal'), 'OK'); return; }
     const vals = [...panel.querySelectorAll('select.res:not(#oqcTotal)')].map(s => s.value);
     setRes($('oqcTotal'), vals.includes('NG') ? 'NG' : vals.includes('OK') ? 'OK' : '');
   }
@@ -376,6 +380,7 @@ function renderOQC(panel, opts = {}) {
     title.querySelector('b').textContent = `[${f.en}]`;
     panel.querySelector('.oqc-ref small').innerHTML = f.ref;
     $('oqcForm').dataset.form = formType === 'First Slot' ? 'first' : 'normal';
+    updateTotal();
   }
   let lastPart = '';
   async function lookupPart(specId = 0) {
@@ -657,7 +662,7 @@ function renderOQC(panel, opts = {}) {
         .map(t => [t.getAttribute('aria-label').slice(9).toLowerCase(), t.value])),
       // Per table (№ 1-11, № 12-22): the results of samples ① .. ⑤
       lengths: lens, lengthResults: [...root.querySelectorAll('.oqc-len')].map(tb => [...tb.querySelectorAll('select.len-res')].map(x => x.value)),
-      total: v('select[aria-label="Total determination"]'), remarks: v('textarea[aria-label="Remarks"]'),
+      total: v('select[aria-label="Total determination"]'), totalNote: v('input[aria-label="Total determination note"]'), remarks: v('textarea[aria-label="Remarks"]'),
       checkedBy: v('input[aria-label="Checked by"]'), inspector: v('input[aria-label="Inspector"]')
     };
   }
@@ -690,7 +695,8 @@ function renderOQC(panel, opts = {}) {
       if (Array.isArray(r)) tb.querySelectorAll('select.len-res').forEach((x, k) => { x.value = r[k] || ''; });
       else checkLength(tb);
     });
-    set('select[aria-label="Total determination"]', d.total); set('textarea[aria-label="Remarks"]', d.remarks);
+    set('select[aria-label="Total determination"]', d.total); set('input[aria-label="Total determination note"]', d.totalNote);
+    set('textarea[aria-label="Remarks"]', d.remarks);
     set('input[aria-label="Checked by"]', d.checkedBy); set('input[aria-label="Inspector"]', d.inspector);
     root.querySelectorAll('select.res').forEach(x => { x.dataset.v = x.value; });
   }
