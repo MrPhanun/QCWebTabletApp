@@ -59,7 +59,7 @@ const STR = {
   'h.customer': ['Customer', 'អតិថិជន'], 'h.itemCode': ['Item Code', 'លេខកូដទំនិញ'], 'h.partNo': ['Part No', 'Part No'],
   'h.type': ['Type', 'ប្រភេទ'], 'see.more': ['See more ({n})', 'មើលបន្ថែម ({n})'], 'see.less': ['See less', 'បង្រួម'], 'cust.all': ['All Customers', 'គ្រប់អតិថិជន'], 'type.all': ['All Types', 'គ្រប់ប្រភេទ'], 'type.sample': ['Sample', 'Sample'], 'type.normal': ['Normal', 'Normal'], 'type.firstSlot': ['First Lot', 'First Lot'],
   'h.wire': ['Wire', 'ខ្សែ'], 'h.terminal': ['Terminal', 'ធឺរមីណល'], 'h.housing': ['Housing', 'ហៅស៊ីង'], 'h.other': ['Other', 'ផ្សេងៗ'],
-  'h.length': ['Length', 'ប្រវែង'], 'h.lastUpdated': ['Last updated', 'កែប្រែចុងក្រោយ'], 'h.lot': ['Lot №', 'Lot №'], 'h.box': ['Box', 'Box'],
+  'h.length': ['Length', 'ប្រវែង'], 'h.lastUpdated': ['Last updated', 'កែប្រែចុងក្រោយ'], 'h.lot': ['Lot №', 'Lot №'], 'h.pos': ['POS', 'POS'], 'h.box': ['Box', 'Box'],
   'h.checkDate': ['Check date', 'ថ្ងៃត្រួតពិនិត្យ'], 'h.pages': ['Pages', 'ទំព័រ'], 'h.status': ['Status', 'ស្ថានភាព'], 'h.total': ['Total', 'សរុប'],
   'h.lastSaved': ['Last saved', 'រក្សាទុកចុងក្រោយ'],
   // OQC Inspection ranges
@@ -92,7 +92,7 @@ const STR = {
   'sc.removeM': ['The length lines on this page will be removed and the later pages move up one page.', 'បន្ទាត់ប្រវែងនៅលើទំព័រនេះនឹងត្រូវលុប ហើយទំព័របន្ទាប់នឹងឡើងមកមួយទំព័រ។'],
   // OQC Data Information
   'ph.scan': ['Scan label barcode', 'ស្កេនបាកូដ'], 'ph.badge': ['Scan badge or type', 'ស្កេនកាត ឬវាយបញ្ចូល'],
-  'ph.find': ['Search Lot, Box, Item Code, Part No, Customer, Inspector…', 'ស្វែងរក Lot, Box, លេខកូដទំនិញ, Part No, អតិថិជន, អ្នកត្រួតពិនិត្យ…'],
+  'ph.find': ['Search POS, Lot, Box, Item Code, Part No, Customer, Inspector…', 'ស្វែងរក POS, Lot, Box, លេខកូដទំនិញ, Part No, អតិថិជន, អ្នកត្រួតពិនិត្យ…'],
   'pg': ['Page {n} / {total}', 'ទំព័រ {n} / {total}'], 'st.complete': ['Can Print', 'អាចបោះពុម្ពបាន'], 'st.draft': ['Draft', 'ព្រាង'],
   'rec.count': ['{n} record{s}', '{n} កំណត់ត្រា'], 'rec.noMatch': ['No saved records match', 'រកមិនឃើញកំណត់ត្រាដែលត្រូវគ្នាទេ'],
   'rec.none': ['No saved records yet', 'មិនទាន់មានកំណត់ត្រាដែលបានរក្សាទុកទេ'],
