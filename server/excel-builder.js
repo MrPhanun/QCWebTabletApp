@@ -112,6 +112,16 @@ function wrapCenteredStyle(ctx, s, vertical = 'center') {
   const key = 'wc' + vertical + s;
   return ctx.cache[key] ?? (ctx.cache[key] = addXf(ctx, wrapCenterXf(xfList(ctx.styles)[+s], vertical)));
 }
+// Style index s with the font of style index f (its own borders, alignment and fill stay)
+function withFontOf(ctx, s, f) {
+  ctx.cache = ctx.cache || {};
+  const key = `f${s}:${f}`;
+  if (ctx.cache[key] !== undefined) return ctx.cache[key];
+  const xfs = xfList(ctx.styles), fontId = (xfs[+f].match(/\bfontId="(\d+)"/) || [])[1];
+  if (fontId === undefined) return (ctx.cache[key] = +s);
+  const xf = xfs[+s].replace(/\s*fontId="\d+"/, '').replace(/\s*applyFont="[^"]*"/, '').replace(/<xf\b/, `<xf fontId="${fontId}" applyFont="1"`);
+  return (ctx.cache[key] = addXf(ctx, xf));
+}
 // Style index s with centered text
 function centeredStyle(ctx, s) {
   ctx.cache = ctx.cache || {};
@@ -245,6 +255,43 @@ function wrapLine(line) {
   return out;
 }
 
+// A blank continuation page for material overflow: the header, footer and Inspection Point results carry over
+// (like a page added by hand), but the Length Check is empty and every material starts as "/" (not used) —
+// the one actually overflowing is filled in by the caller right after.
+const makeContinuationPage = prev => ({ ...prev, material: { wire: '/', terminal: '/', housing: '/', other: '/' }, lengths: [], lengthResults: [] });
+
+// If a material's text doesn't fit its rows, spill the overflow onto the next page's own box for the same
+// material, continuing at the top; if there is no next page, one is added just for this (print only — the
+// saved record is never changed). Can cascade through several pages for very long text, up to the same 50-page
+// ceiling the record itself is limited to, so a runaway value can't generate an unbounded printout.
+// Returns the (possibly longer) pages array with material text re-split, and which "pageIndex:materialKey"
+// pairs are a continuation (so their Result stays blank there instead of showing "/" or repeating page 1's).
+const MAX_PAGES = 50;
+function splitMaterialOverflow(pages) {
+  const continued = new Set();
+  pages = pages.map(d => ({ ...d, material: { ...(d.material || {}) } }));
+  for (const k of Object.keys(MATERIAL_ROWS)) {
+    const rows = MATERIAL_ROWS[k].length;
+    let p = 0;
+    while (p < pages.length) {
+      const text = pages[p].material[k];
+      if (!text || text === '/') break;
+      const lines = String(text).split(/\r?\n/).flatMap(wrapLine);
+      if (lines.length <= rows) break;
+      pages[p].material[k] = lines.slice(0, rows).join('\n');
+      const rest = lines.slice(rows).join('\n');
+      p++;
+      if (p >= pages.length) {
+        if (pages.length >= MAX_PAGES) { pages[p - 1].material[k] = lines.join(' '); break; }   // out of room: fall back to cramming it, as before
+        pages.push(makeContinuationPage(pages[p - 1]));
+      }
+      pages[p].material[k] = rest;
+      continued.add(p + ':' + k);
+    }
+  }
+  return { pages, continued };
+}
+
 // ---- OQC Data Information: values pasted into the template's own cells, nothing else changed ----
 function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
@@ -275,10 +322,12 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     if (textBoxes) continue;
     const lines = String((d.material || {})[k] || '').split(/\r?\n/).flatMap(wrapLine);
     if (lines.length > rows.length) lines.splice(rows.length - 1, lines.length - rows.length + 1, lines.slice(rows.length - 1).join(' '));
-    // every line takes the font of the first line (the lower rows of a box are set smaller in the template)
+    // every line takes the font of the first line (the lower rows of a box are set smaller in the template), but keeps
+    // its own borders: the last row carries the box's bottom (double) line, which copying the first row's whole style erased
     const first = styleOf(sheet, `C${rows[0]}`);
     lines.forEach((line, i) => {
-      if (i > 0 && first !== undefined && line) sheet = useStyle(sheet, `C${rows[i]}`, first);
+      const own = styleOf(sheet, `C${rows[i]}`);
+      if (i > 0 && first !== undefined && own !== undefined && line) sheet = useStyle(sheet, `C${rows[i]}`, withFontOf(ctx, own, first));
       set(`C${rows[i]}`, line);
     });
   }
@@ -564,14 +613,18 @@ async function buildSpecWorkbook(pages) {
 // (as saved by OQC Data Information); itemList: [[Khmer, English], ...] for items 3)-11)
 async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
   if (kind === 'spec') return buildSpecWorkbook(pages);
+  // Material text too long for page 1's rows spills onto the next page, same box, continuing at the top —
+  // adding that page if the record doesn't already have one (print only; the saved record is unchanged)
+  const { pages: splitPages, continued } = splitMaterialOverflow(pages);
   // Pages 2, 3, ... (SPEC lines 23-44, 45-66, ...) show "/" for the Wire / Terminal / Housing / Other text and results;
-  // on page 1 a material whose result is "/" (not used) shows "/" as its text too
-  pages = pages.map((d, i) => {
+  // on page 1 a material whose result is "/" (not used) shows "/" as its text too; a page holding the overflow of a
+  // page 1 material shows that text with a blank Result (not "/", and not page 1's result repeated)
+  pages = splitPages.map((d, i) => {
     const items = { ...(d.items || {}) };
-    if (i > 0) Object.keys(MATERIAL).forEach(k => { items[materialKey(k)] = '/'; });
+    if (i > 0) Object.keys(MATERIAL).forEach(k => { items[materialKey(k)] = continued.has(`${i}:${k}`) ? '' : '/'; });
     const material = Object.fromEntries(Object.keys(MATERIAL).map(k =>
       [k, items[materialKey(k)] === '/' ? '/' : (d.material || {})[k] || '']));
-    return { ...d, items, material, pageNo: i + 1, pageCount: pages.length };
+    return { ...d, items, material, pageNo: i + 1, pageCount: splitPages.length };
   });
   // First Slot (the Part No's SPEC Type) uses the Spec template (form "First Lot"): same layout, but the material text is in text boxes
   if (kind === 'oqc' && pages[0].type === 'First Slot') {

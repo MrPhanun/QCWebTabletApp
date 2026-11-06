@@ -709,9 +709,37 @@ function renderOQC(panel, opts = {}) {
   function snapFromNamed(d) { const t = pageClone(); writeNamed(t, d); return { vals: fields(t).map(c => c.value), prob: d.probability || '', sample: !!d.sample }; }
   function pageComplete(snap) { const t = pageClone(); applySnapshot(t, snap); return !missingOn(t).length; }
 
+  // Mirrors server/excel-builder.js (MATERIAL_LINE_MAX, wrapLine, MATERIAL_ROWS row counts): true once a
+  // material's text needs more lines than its box has rows, i.e. printing would have to spill it onto page 2
+  const MATERIAL_LINE_MAX = 58, MATERIAL_ROW_COUNTS = { wire: 3, terminal: 4, housing: 4, other: 3 };
+  function wrapLine(line) {
+    const out = [];
+    let rest = String(line);
+    while (rest.length > MATERIAL_LINE_MAX) {
+      const head = rest.slice(0, MATERIAL_LINE_MAX + 1);
+      const at = Math.max(head.lastIndexOf(' '), head.lastIndexOf(','), head.lastIndexOf(';'));
+      const cut = at > MATERIAL_LINE_MAX / 2 ? at + 1 : MATERIAL_LINE_MAX;
+      out.push(rest.slice(0, cut).trimEnd());
+      rest = rest.slice(cut).trimStart();
+    }
+    out.push(rest);
+    return out;
+  }
+  const materialOverflows = d => Object.entries(MATERIAL_ROW_COUNTS).some(([k, rows]) => {
+    const text = (d.material || {})[k];
+    return text && text !== '/' && String(text).split(/\r?\n/).flatMap(wrapLine).length > rows;
+  });
+
   async function saveRecord(forceId) {
     if (!can((forceId || rec.id) ? 'daily.edit' : 'daily.add')) return msg(t('e.noPerm'));
     pages[cur] = snapshot();
+    // A material too long for page 1's rows needs a page 2 to print into; Add Page needs 'daily.special', so
+    // this only adds one automatically for users who could add it themselves anyway
+    if (pages.length === 1 && canSpecial && materialOverflows(namedFromSnap(pages[0]))) {
+      pages.push(withoutLengths(pages[0]));
+      showPages();
+      msg(t('o.pageAddedAuto'), 'ok');
+    }
     clearMissing();
     const named = pages.map(namedFromSnap), h = named[0];
     if (!h.lot) {
