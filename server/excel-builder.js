@@ -96,6 +96,22 @@ function centerXf(xf) {
   else out = out.replace(/<\/xf>$/, al + '</xf>');
   return out.replace(/<xf\b/, '<xf applyAlignment="1"');
 }
+// Like centerXf, but also wraps long text onto more than one line within the (merged) cell; vertical is "top" or "center"
+function wrapCenterXf(xf, vertical = 'center') {
+  const al = `<alignment horizontal="center" vertical="${vertical}" wrapText="1"/>`;
+  let out = xf.replace(/\s*applyAlignment="[^"]*"/, '');
+  if (/<alignment\b[^>]*\/>/.test(out)) out = out.replace(/<alignment\b[^>]*\/>/, al);
+  else if (/\/>$/.test(out)) out = out.replace(/\/>$/, `>${al}</xf>`);
+  else if (out.includes('<protection')) out = out.replace('<protection', al + '<protection');
+  else out = out.replace(/<\/xf>$/, al + '</xf>');
+  return out.replace(/<xf\b/, '<xf applyAlignment="1"');
+}
+// Style index s with centered, wrapped text
+function wrapCenteredStyle(ctx, s, vertical = 'center') {
+  ctx.cache = ctx.cache || {};
+  const key = 'wc' + vertical + s;
+  return ctx.cache[key] ?? (ctx.cache[key] = addXf(ctx, wrapCenterXf(xfList(ctx.styles)[+s], vertical)));
+}
 // Style index s with centered text
 function centeredStyle(ctx, s) {
   ctx.cache = ctx.cache || {};
@@ -305,6 +321,10 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     else set(`${side.samples[0][0]}${RESULT_ROW}`, res);
   });
   // Footer: remarks, total determination, checked by, inspector
+  // Remarks text is centered horizontally and sits near the top of its box: the box is A43:AC43 in the template but
+  // not an actual merge (its cells just share borders to look like one), so a centered A43 alone would only center
+  // within column A's own width. Merging it for real lets the text center — and wrap — across the whole box.
+  { const s = styleOf(sheet, 'A43'); if (s !== undefined) { sheet = addMerge(sheet, 'A43:AC43'); sheet = useStyle(sheet, 'A43', wrapCenteredStyle(ctx, s, 'top')); } }
   set('A43', d.remarks);
   set('AD43', d.total);
   set('AK43', d.checkedBy);

@@ -89,7 +89,7 @@ function renderOQC(panel, opts = {}) {
 
       <div class="oqc-foot-wrap"><table class="oqc oqc-foot">
         <tr>
-          <td rowspan="2" style="width:52%">${bi('កំណត់សំគាល់', 'Remarks')}<textarea rows="3" aria-label="Remarks"></textarea></td>
+          <td rowspan="2" style="width:52%"><div class="remark-row"><span class="remark-label">${bi('កំណត់សំគាល់', 'Remarks')}</span><textarea rows="3" aria-label="Remarks"></textarea></div></td>
           <th class="c">${bi('សរុបលទ្ធផល', 'Total Determination')}</th>
           <th class="c">${bi('ត្រួតពិនិត្យដោយ', 'Checked by')}</th>
           <th class="c">${bi('អ្នកត្រួតពិនិត្យ', 'Inspector')}</th>
