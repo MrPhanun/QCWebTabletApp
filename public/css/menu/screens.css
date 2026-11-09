@@ -216,6 +216,9 @@ table.oqc tr.sec td { background: rgba(5,150,105,.06); }
 .oqc-sec-title { font-weight: 700; margin-bottom: 6px; }
 .oqc-sec-title .km, .oqc-sec-title .en { display: inline; }
 .oqc-foot td { vertical-align: top; }
+/* A record opened from Search Draft / Save: label scan, Customer and Part No are read-only */
+input.locked, .oqc-sheet input.locked { background: #f1f5f9; color: var(--ink-soft); cursor: not-allowed; }
+input.locked:focus, .oqc-sheet input.locked:focus { border-color: transparent; box-shadow: none; }
 /* Remarks: the label sits beside the box instead of above it, "Remarks : [box]" */
 .remark-row { display: flex; align-items: center; gap: 8px; }
 .remark-label { flex: none; white-space: nowrap; text-align: center; }

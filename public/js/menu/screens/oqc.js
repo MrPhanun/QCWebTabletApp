@@ -112,6 +112,8 @@ function renderOQC(panel, opts = {}) {
   const $ = id => panel.querySelector('#' + id);
   const msg = (text, kind = 'err') => { $('oqcMsg').textContent = text; $('oqcMsg').className = 'msg ' + kind; };
   const setRes = (sel, v) => { sel.value = v; sel.dataset.v = v; };
+  // A record opened from Search Draft / Save keeps its label, Customer and Part No: scan and Part No lookup are off
+  let opened = false;
 
   // SPEC formats: "100±2", "100+2/-1", "100 (+10/-5)", "98-102"
   function parseSpec(s) {
@@ -272,6 +274,7 @@ function renderOQC(panel, opts = {}) {
   // (a label that could not be read stays in the box, selected)
   const clearScan = () => { $('oqcScan').value = ''; lastScan = ''; };
   async function scan() {
+    if (opened) return;
     const code = $('oqcScan').value.trim();
     if (!code) return;
     lastScan = code;
@@ -385,6 +388,7 @@ function renderOQC(panel, opts = {}) {
   let lastPart = '';
   async function lookupPart(specId = 0) {
     if (!Number.isInteger(specId)) specId = 0;   // called as an event handler: the argument is the Event
+    if (opened) return;
     const part = $('oqcPart').value.trim();
     if (!part || (part === lastPart && !specId)) return;
     lastPart = part;
@@ -812,6 +816,10 @@ function renderOQC(panel, opts = {}) {
   // Search Draft / Save sends a record here (Open) or asks for its PDF
   if (pendingOqc) {
     const job = pendingOqc; pendingOqc = null;
+    opened = true;
+    [$('oqcScan'), $('oqcPart'), panel.querySelector('input[aria-label="CUSTOMER"]')].forEach(el => {
+      if (el) { el.readOnly = true; el.tabIndex = -1; el.classList.add('locked'); }
+    });
     loadRecord(job.id).then(r => {
       msg(t('o.openedRec', { id: r.id, lot: r.lot, box: r.box ? `, Box ${r.box}` : '', state: t(r.complete ? 'st.complete' : 'st.draft') }), 'ok');
       if (job.check) showMissing();   // a draft: outline in red what is still to be filled in
