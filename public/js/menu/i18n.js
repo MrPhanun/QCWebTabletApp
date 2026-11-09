@@ -127,7 +127,7 @@ const STR = {
   'h.shipQty': ['Shipment Qty', 'ចំនួនដឹកជញ្ជូន'], 'h.excelStatus': ['Excel Status', 'ស្ថានភាព Excel'], 'h.pdfStatus': ['PDF Status', 'ស្ថានភាព PDF'], 'st.all': ['All', 'ទាំងអស់'], 'h.delStatus': ['Record Status', 'ស្ថានភាពទិន្នន័យ'], 'st.active': ['Active', 'សកម្ម'], 'st.deleted': ['Deleted', 'បានលុប'], 'st.printed': ['Printed', 'បានព្រីន'],
   'o.chooseSpecT': ['Choose the SPEC', 'ជ្រើសរើស SPEC'], 'o.chooseSpecM': ['Part No {part} has {n} SPECs. Which one does this item need?', 'Part No {part} មាន SPEC {n}។ តើទំនិញនេះត្រូវប្រើមួយណា?'],
   'o.specNotChosen': ['No SPEC chosen for {part}. Scan again or press Enter in Part No to choose.', 'មិនបានជ្រើស SPEC សម្រាប់ {part}។ ស្កេនម្តងទៀត ឬចុច Enter ក្នុង Part No ដើម្បីជ្រើស។'],
-  'o.shipFrom': ['Shipment from', 'ថ្ងៃដឹកជញ្ជូនពី'], 'o.shipTo': ['to', 'ដល់'], 'h.shipDate': ['Shipment Date', 'ថ្ងៃដឹកជញ្ជូន'], 'b.pdf': ['PDF', 'PDF'],
+  'o.shipFrom': ['Shipment from', 'ថ្ងៃដឹកជញ្ជូនពី'], 'o.regFrom': ['Reg date from', 'ថ្ងៃចុះបញ្ជីពី'], 'o.shipTo': ['to', 'ដល់'], 'h.shipDate': ['Shipment Date', 'ថ្ងៃដឹកជញ្ជូន'], 'b.pdf': ['PDF', 'PDF'],
   'dr.pick': ['Click a row first, then press Excel or PDF.', 'សូមចុចជួរមួយជាមុនសិន រួចចុច Excel ឬ PDF។'],
   'dr.notReadyM': ['This record is a draft, so some points are still empty. Excel and PDF need every point filled in. Open it to complete?', 'កំណត់ត្រានេះជាសេចក្តីព្រាង នៅមានចំណុចទទេ។ Excel និង PDF ត្រូវការបំពេញគ្រប់ចំណុច។ បើកដើម្បីបំពេញឬទេ?'],
   'dr.cantPrintT': ["Can't print yet", 'មិនទាន់អាចបោះពុម្ពបានទេ'],

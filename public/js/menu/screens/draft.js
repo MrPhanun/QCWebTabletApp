@@ -16,6 +16,8 @@ function renderDraft(panel) {
       </label>
       <label class="oqc-ship">${T('o.shipFrom')}<input type="date" id="drFrom" aria-label="Shipment Date from"></label>
       <label class="oqc-ship">${T('o.shipTo')}<input type="date" id="drTo" aria-label="Shipment Date to"></label>
+      <label class="oqc-ship">${T('o.regFrom')}<input type="date" id="drRegFrom" aria-label="Reg date from"></label>
+      <label class="oqc-ship">${T('o.shipTo')}<input type="date" id="drRegTo" aria-label="Reg date to"></label>
       <select id="drCust" class="cust-filter" aria-label="Filter by Customer"><option value="">${esc(t('cust.all'))}</option></select>
       <div class="seg type-seg" id="drType" role="group" aria-label="Filter by Type" data-value="">
         <button type="button" data-type="" aria-pressed="true">${T('type.all')}</button>
@@ -38,7 +40,7 @@ function renderDraft(panel) {
       <span class="count" id="drCount"></span>
       <div class="msg" id="drMsg" role="status"></div>
     </div>
-    <div class="table-wrap"><table class="data frz">
+    <div class="table-wrap spec-list"><table class="data frz">
       <thead><tr>${['h.pos', 'h.shipDate', 'h.itemCode', 'h.partNo', 'h.type', 'h.customer', 'h.checkDate', 'h.lot', 'h.box', 'h.shipQty', 'h.pages', 'h.status', 'h.total', 'h.pdfStatus', 'h.lastSaved']
         .map(k => `<th>${T(k)}</th>`).join('')}<th></th></tr></thead>
       <tbody id="drBody"></tbody>
@@ -64,12 +66,12 @@ function renderDraft(panel) {
     } catch { /* the list is only a help: search still works */ }
   }
   async function search() {
-    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, type: $('drType').dataset.value, customer: $('drCust').value, pdf: $('drPdf').dataset.value, status: $('drDel').dataset.value });
+    const qs = new URLSearchParams({ q: $('drQ').value.trim(), from: $('drFrom').value, to: $('drTo').value, regFrom: $('drRegFrom').value, regTo: $('drRegTo').value, type: $('drType').dataset.value, customer: $('drCust').value, pdf: $('drPdf').dataset.value, status: $('drDel').dataset.value });
     const isDeleted = $('drDel').dataset.value === 'deleted';
     try {
       list = await api('GET', `/api/oqc/records?${qs}`);
       $('drCount').textContent = t('rec.count', { n: list.length === 200 ? '200+' : list.length, s: list.length === 1 ? '' : 's' });
-      const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drType').dataset.value || $('drCust').value || $('drPdf').dataset.value;
+      const filtered = $('drQ').value.trim() || $('drFrom').value || $('drTo').value || $('drRegFrom').value || $('drRegTo').value || $('drType').dataset.value || $('drCust').value || $('drPdf').dataset.value;
       $('drBody').innerHTML = list.map(r => `<tr data-id="${r.id}"${isDeleted ? ' class="deleted"' : ''}>
           <td class="num key">${s2(r.pos)}</td><td class="key">${s2(dmy(r.shipDate))}</td><td class="num">${s2(r.itemCode)}</td><td>${s2(r.partNo)}</td>
           <td>${typePill(r.type)}</td>
@@ -84,6 +86,8 @@ function renderDraft(panel) {
             ? `<button class="icon-btn" data-excel="${r.id}">${ico('excel')}${T('b.excel')}</button><button class="icon-btn" data-pdf="${r.id}">${ico('printer')}${T('b.pdf')}</button>` : ''}${can('daily.delete')
             ? `<button class="icon-btn del" data-del="${r.id}">${ico('trash')}${T('b.delete')}</button>` : ''}</div>`}</td>
         </tr>`).join('') || `<tr><td colspan="16" class="empty-row">${esc(t(filtered ? 'rec.noMatch' : 'rec.none'))}</td></tr>`;
+      // Like the SPEC list: 7 rows show, the rest scroll inside the list (header stays on top)
+      $('drBody').closest('.spec-list').classList.toggle('scrolling', list.length > 7);
     } catch (err) { msg(err.message); }
   }
 
@@ -165,6 +169,8 @@ function renderDraft(panel) {
   $('drCust').addEventListener('change', search);
   $('drFrom').addEventListener('change', search);
   $('drTo').addEventListener('change', search);
+  $('drRegFrom').addEventListener('change', search);
+  $('drRegTo').addEventListener('change', search);
   langHook = () => { fillCustomers(); search(); };
   fillCustomers();
   search();
