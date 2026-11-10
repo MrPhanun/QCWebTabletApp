@@ -54,7 +54,7 @@ async function saveRecord(id, r, userId) {
     .query(`SET XACT_ABORT ON;
       DECLARE @dup int = NULL, @rc int = 0, @newId int = NULL, @reset bit = 0;
       BEGIN TRAN;
-      SELECT TOP 1 @dup = SysNo FROM OqcRecord WITH (UPDLOCK, HOLDLOCK) WHERE DelStatus = 'Active' AND Customer = @customer
+      SELECT TOP 1 @dup = SysNo FROM OqcRecord WITH (UPDLOCK, HOLDLOCK) WHERE DelStatus = 'Active' AND Customer = @customer AND PartNo = @partNo
         AND ISNULL(ShipmentDate, '1900-01-01') = @shipDate AND ISNULL(Qty, -1) = ISNULL(@qty, -1) AND SysNo <> @id;
       IF @dup IS NULL
       BEGIN
@@ -156,7 +156,7 @@ async function handleOqcRecords(req, res, session, id) {
       const r = validateRecord(body);
       if (r.error) return sendJson(res, 400, r);
       const out = await saveRecord(id || 0, r, session.id);
-      if (out.dup != null) return sendJson(res, 409, { error: `A record with the same Customer, Shipment Date and Qty is already saved`, existingId: out.dup });
+      if (out.dup != null) return sendJson(res, 409, { error: `A record with the same Customer, Part No, Shipment Date and Qty is already saved`, existingId: out.dup });
       if (!out.rc) return sendJson(res, 404, { error: 'This record no longer exists' });
       if (out.reset) removeRecordFile(out.newId, '.pdf');
       return sendJson(res, id ? 200 : 201, { id: out.newId });
@@ -214,11 +214,14 @@ async function handleOqcLabel(req, res, session) {
     const { recordset } = await pool.request()
       .input('lot', sql.VarChar(50), lot).input('item', sql.VarChar(50), item)
       .input('box', sql.VarChar(20), box).input('boxNum', sql.VarChar(20), boxNum)
+      // The box's receive (GRICode 30); a box split off another one later has no receive, only its split
+      // transaction (GRICode 55, e.g. 400 received in Box 1, then 200 moved into Box 2): that one is used instead
       .query(`SELECT TOP 1 tbt.LotNo AS lot, tbm.ItemName AS partNo, tbt.ReceiveQty AS qty, tbt.BoxNO AS box
         FROM [192.168.1.21].[Marunix].[dbo].[prgalltransaction] tbt
         LEFT JOIN [192.168.1.21].[Marunix].[dbo].[mstitem] tbm ON tbt.ItemCode = tbm.ItemCode
-        WHERE tbt.GRICode = '30' AND tbt.TypeCode = 1 AND tbt.LotNo = @lot AND tbt.ItemCode = @item
-          AND tbt.BoxNO IN (@box, @boxNum)`);
+        WHERE tbt.TypeCode = 1 AND tbt.LotNo = @lot AND tbt.ItemCode = @item AND tbt.BoxNO IN (@box, @boxNum)
+          AND (tbt.GRICode = '30' OR (tbt.GRICode = '55' AND tbt.ReceiveQty > 0))
+        ORDER BY CASE tbt.GRICode WHEN '30' THEN 0 ELSE 1 END`);
     if (!recordset[0]) return sendJson(res, 404, { error: `Label ${lot}, Item Code ${item}, Box ${box} is not in Marunix` });
     const r = recordset[0];
     sendJson(res, 200, { lot: String(r.lot || '').trim(), partNo: String(r.partNo || '').trim(), qty: r.qty, box: String(r.box || '').trim() });
