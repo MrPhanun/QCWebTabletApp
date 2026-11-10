@@ -24,11 +24,11 @@ function renderSampling(panel) {
         <button class="icon-btn" id="spCancel" type="button" hidden>${ico('x')}${T('b.cancel')}</button>
       </div>
     </form>
-    <label class="flt-pdf"><span>${T('h.delStatus')}</span>
+    <div class="flt-pdf"><span>${T('h.delStatus')}</span>
       <div class="seg type-seg" id="spStatus" role="group" aria-label="Filter by Record Status">
         <button type="button" data-v="active" aria-pressed="true">${T('st.active')}</button>
         <button type="button" data-v="deleted" aria-pressed="false">${T('st.deleted')}</button>
-      </div></label>
+      </div></div>
     <div class="msg" id="spMsg" role="status"></div>
     <div id="spTables"></div>`;
 
