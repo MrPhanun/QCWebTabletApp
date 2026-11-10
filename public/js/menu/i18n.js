@@ -109,7 +109,7 @@ const STR = {
   'o.delT': ['Delete this record?', 'លុបកំណត់ត្រានេះ?'],
   'o.delM': ['<b>{label}</b> and all its pages will be deleted. This cannot be undone.', '<b>{label}</b> និងទំព័រទាំងអស់របស់វានឹងត្រូវលុប។ មិនអាចយកមកវិញបានទេ។'],
   'o.deleted': ['Deleted {label}', 'បានលុប {label}'],
-  'o.labelFound':['Part No {part}, Qty {qty} from Marunix', 'Part No {part} ចំនួន {qty} ពី Marunix'],
+  'o.labelFound':['Part No {part} from Marunix, Qty {qty} from the label', 'Part No {part} ពី Marunix · ចំនួន {qty} ពីស្លាក'],
   'o.labelMissing': ['Label {lot} / {item} / Box {box} is not in Marunix — Lot and Qty are taken from the barcode', 'រកមិនឃើញស្លាក {lot} / {item} / Box {box} ក្នុង Marunix ទេ — Lot និងចំនួន យកពីបាកូដ'],
   'o.enterPart':['Enter the Part No to fill Customer and SPEC', 'សូមបញ្ចូល Part No ដើម្បីបំពេញ អតិថិជន និង SPEC'],
   'o.specFound': ['SPEC of Part No {part} filled', 'បានបំពេញ SPEC របស់ Part No {part}'], 'o.lines': ['{n} length lines', '{n} បន្ទាត់ប្រវែង'],
