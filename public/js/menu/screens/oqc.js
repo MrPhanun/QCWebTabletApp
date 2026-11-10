@@ -300,8 +300,8 @@ function renderOQC(panel, opts = {}) {
         if (dirty && !await confirmDiscard()) return;
         return renderOQC(panel, { scan: code });
       }
-      // Lot No, Part No and Qty of the label from its receive transaction in Marunix; when the label is not there,
-      // Lot and Qty come from the barcode itself and the Part No is typed by hand. Customer + SPEC come from the Part No.
+      // Part No of the label from its receive transaction in Marunix; when the label is not there, the Part No is
+      // typed by hand. Lot and Qty come from the barcode itself. Customer + SPEC come from the Part No.
       let label = null, labelErr = '';
       try { label = await api('GET', `/api/oqc/label?lot=${encodeURIComponent(lot)}&item=${encodeURIComponent(item)}&box=${encodeURIComponent(box)}`); }
       catch (err) { labelErr = err.status === 404 ? t('o.labelMissing', { lot, item, box }) : err.message; }
@@ -309,7 +309,8 @@ function renderOQC(panel, opts = {}) {
       $('oqcCustomer').value = '';
       $('oqcPart').value = label ? label.partNo : '';
       $('oqcLot').value = '';   // Lot № is a date (dd-mm-yyyy) typed or picked by hand
-      $('oqcQty').value = label && label.qty != null ? String(label.qty) : /^\d+$/.test(qtyInCode) ? qtyInCode : '';
+      // Qty = the label's own Qty (3rd part of the barcode); Marunix's ReceiveQty only when the barcode has none
+      $('oqcQty').value = /^\d+$/.test(qtyInCode) ? qtyInCode : label && label.qty != null ? String(label.qty) : '';
       $('oqcSpot').value = '';
       if (cur > 0) panel.querySelectorAll('select.mat-res').forEach(sel => setRes(sel, 'OK'));   // was a later page's "/"
       pages = [null]; cur = 0;   // back to one page; the Part No's SPEC adds the pages it needs
