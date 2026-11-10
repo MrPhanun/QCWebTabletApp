@@ -25,17 +25,17 @@ function renderDraft(panel) {
         <button type="button" data-type="First Slot" aria-pressed="false">${T('type.firstSlot')}</button>
         <button type="button" data-type="Sample" aria-pressed="false">${T('type.sample')}</button>
       </div>
-      <label class="flt-pdf"><span>${T('h.pdfStatus')}</span>
+      <div class="flt-pdf"><span>${T('h.pdfStatus')}</span>
         <div class="seg type-seg" id="drPdf" role="group" aria-label="Filter by PDF Status" data-value="">
           <button type="button" data-v="" aria-pressed="true">${T('st.all')}</button>
           <button type="button" data-v="draft" aria-pressed="false">${T('st.draft')}</button>
           <button type="button" data-v="printed" aria-pressed="false">${T('st.printed')}</button>
-        </div></label>
-      <label class="flt-pdf"><span>${T('h.delStatus')}</span>
+        </div></div>
+      <div class="flt-pdf"><span>${T('h.delStatus')}</span>
         <div class="seg type-seg" id="drDel" role="group" aria-label="Filter by Record Status" data-value="active">
           <button type="button" data-v="active" aria-pressed="true">${T('st.active')}</button>
           <button type="button" data-v="deleted" aria-pressed="false">${T('st.deleted')}</button>
-        </div></label>
+        </div></div>
       <button class="btn-primary" id="drSearch" type="button">${ico('search')}${T('b.search')}</button>
       <span class="count" id="drCount"></span>
       <div class="msg" id="drMsg" role="status"></div>
