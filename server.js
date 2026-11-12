@@ -8,6 +8,7 @@ const { getPerms, permFor } = require('./server/permissions');
 const { serveConfigJs, serveStatic } = require('./server/static');
 const { handleLogin, handleLogout, handleMe } = require('./server/routes/auth');
 const { handlePermissions } = require('./server/routes/permissions');
+const { handleUiSettings } = require('./server/routes/ui-settings');
 const { handleOqcExcel, handleOqcPdf, handleRecordExport } = require('./server/routes/excel');
 const { handleUsers, handleUserName } = require('./server/routes/users');
 const { handleSpec } = require('./server/routes/spec');
@@ -33,6 +34,7 @@ http.createServer(async (req, res) => {
     if (![].concat(need).some(k => perms.includes(k))) return sendJson(res, 403, { error: 'You do not have permission to do this' });
   }
   if (urlPath === '/api/permissions') return handlePermissions(req, res, getSession(req));
+  if (urlPath === '/api/ui-settings') return handleUiSettings(req, res, getSession(req));
   const xm = urlPath.match(/^\/api\/excel\/(oqc|spec)$/);
   if (xm) return handleOqcExcel(req, res, getSession(req), xm[1]);
   if (urlPath === '/api/pdf/oqc') return handleOqcPdf(req, res, getSession(req));

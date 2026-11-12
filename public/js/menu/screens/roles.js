@@ -7,7 +7,8 @@ const PERM_GROUPS = [
   { k: 'm.spec', keys: ['spec.view', 'spec.add', 'spec.edit', 'spec.delete', 'spec.excel'] },
   { k: 'm.daily', keys: ['daily.view', 'daily.add', 'daily.edit', 'daily.delete', 'daily.excel', 'daily.special'] },
   { k: 'm.users', keys: ['users.view', 'users.add', 'users.edit', 'users.delete'] },
-  { k: 'm.roles', keys: ['roles.view', 'roles.edit'] }
+  { k: 'm.roles', keys: ['roles.view', 'roles.edit'] },
+  { k: 'm.customize', keys: ['ui.view', 'ui.edit'] }
 ];
 function renderRoles(panel) {
   const canEdit = can('roles.edit');

@@ -2,7 +2,7 @@
 // they are loaded in the order listed at the bottom of menu.html.
 
 // ---- Screens: menu ids that have a real screen instead of the placeholder ----
-const SCREENS = { sampling: renderSampling, spec: renderSpec, daily: renderOQC, draft: renderDraft, users: renderUsers, roles: renderRoles };
+const SCREENS = { sampling: renderSampling, spec: renderSpec, daily: renderOQC, draft: renderDraft, users: renderUsers, roles: renderRoles, customize: renderCustomize };
 
 // Language switch: update text in place (forms keep what was typed), then let lists/counters redraw
 function setLang(l) {
@@ -36,6 +36,7 @@ fetch('/api/me').finally(() => setBusy(false)).then(r => r.ok ? r.json() : Promi
   document.getElementById('userName').textContent = u.username;
   document.getElementById('userRole').textContent = [u.role, u.dept, u.id].filter(Boolean).join(' • ');
   document.getElementById('avatar').textContent = (u.username || '?').trim().charAt(0).toUpperCase();
+  loadUiSettings();
   treeData = filterByPerm(MENU);
   buildTree(treeData, treeEl, null, 1);
   select(nodesById[state.selected] ? state.selected : 'dashboard');

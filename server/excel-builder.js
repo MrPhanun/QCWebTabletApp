@@ -4,6 +4,7 @@
 const path = require('path');
 const fs = require('fs');
 const JSZip = require('jszip');
+const { PDF_DEFAULT, cleanPdfOptions } = require('./pdf-options');
 
 // OQC Data Information uses the "OQC Data Information" sheet of its template file (the file also holds a "Spec" sheet);
 // the SPEC page uses the print template
@@ -128,6 +129,20 @@ function centeredStyle(ctx, s) {
   const key = 'c' + s;
   return ctx.cache[key] ?? (ctx.cache[key] = addXf(ctx, centerXf(xfList(ctx.styles)[+s])));
 }
+// Style index s with its font at another size (Customize UI › PDF / Excel); everything else as it was
+function sizedStyle(ctx, s, size) {
+  ctx.cache = ctx.cache || {};
+  const key = `z${s}:${size}`;
+  if (ctx.cache[key] !== undefined) return ctx.cache[key];
+  const xf = xfList(ctx.styles)[+s];
+  const fonts = ctx.styles.match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)[1].match(/<font\b[^>]*\/>|<font\b[^>]*>[\s\S]*?<\/font>/g) || [];
+  let font = fonts[+((xf.match(/\bfontId="(\d+)"/) || [])[1] || 0)] || '<font></font>';
+  if (/^<font\b[^>]*\/>$/.test(font)) font = '<font></font>';
+  font = /<sz\b/.test(font) ? font.replace(/<sz\b[^>]*\/>/, `<sz val="${size}"/>`) : font.replace(/^<font\b[^>]*>/, m => `${m}<sz val="${size}"/>`);
+  ctx.styles = ctx.styles.replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${fonts.length + 1}"${a}>${b}${font}</fonts>`);
+  const out = xf.replace(/\s*fontId="\d+"/, '').replace(/\s*applyFont="[^"]*"/, '').replace(/<xf\b/, `<xf fontId="${fonts.length}" applyFont="1"`);
+  return (ctx.cache[key] = addXf(ctx, out));
+}
 // Style index s, centered, with its border plus one thin diagonal line from bottom-left to top-right
 function diagonalStyle(ctx, s, down = false) {
   ctx.cache = ctx.cache || {};
@@ -156,9 +171,10 @@ function specSplitStyles(ctx) {
   ctx.cache = ctx.cache || {};
   const edge = (n, open) => `<border><left${open === 'L' ? '' : ' style="thin"'}>${open === 'L' ? '' : '<color indexed="64"/>'}</left><right${open === 'R' ? '' : ' style="thin"'}>${open === 'R' ? '' : '<color indexed="64"/>'}</right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>`;
   const nB = +ctx.styles.match(/<borders count="(\d+)"/)[1], nF = +ctx.styles.match(/<fonts count="(\d+)"/)[1];
+  const big = ctx.opt.pdfSpecFont, small = Math.round(big * 9 / 10.5 * 2) / 2;   // tolerance: 9 next to 10.5, in proportion
   ctx.styles = ctx.styles
     .replace(/<borders count="\d+">([\s\S]*?)<\/borders>/, (m, b) => `<borders count="${nB + 2}">${b}${edge(0, 'R')}${edge(0, 'L')}</borders>`)
-    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 2}"${a}>${b}<font><sz val="9"/><name val="Cambria"/><family val="1"/></font><font><sz val="10.5"/><name val="Cambria"/><family val="1"/></font></fonts>`);
+    .replace(/<fonts count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/, (m, a, b) => `<fonts count="${nF + 2}"${a}>${b}<font><sz val="${small}"/><name val="Cambria"/><family val="1"/></font><font><sz val="${big}"/><name val="Cambria"/><family val="1"/></font></fonts>`);
   const left = addXf(ctx, `<xf numFmtId="0" fontId="${nF + 1}" fillId="0" borderId="${nB}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`);
   const right = addXf(ctx, `<xf numFmtId="0" fontId="${nF}" fillId="0" borderId="${nB + 1}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`);
   return (ctx.cache.spec = { left, right });
@@ -176,7 +192,7 @@ function setSpec(sheet, side, row, spec, ctx) {
       sheet = useStyle(sheet, `${c1}${row}`, ctx.cache[key]);
     }
   }
-  if (!m || !ctx) return setCell(sheet, `${c1}${row}`, String(spec ?? '') === '' ? spec : { text: String(spec), size: 10.5, font: 'Cambria' });
+  if (!m || !ctx) return setCell(sheet, `${c1}${row}`, String(spec ?? '') === '' ? spec : { text: String(spec), size: ctx ? ctx.opt.pdfSpecFont : 10.5, font: 'Cambria' });
   const st = specSplitStyles(ctx);
   sheet = sheet.replace(`<mergeCell ref="${c1}${row}:${c3}${row}"/>`, `<mergeCell ref="${c1}${row}:${c2}${row}"/>`);
   sheet = useStyle(useStyle(sheet, `${c1}${row}`, st.left), `${c2}${row}`, st.left);
@@ -188,11 +204,10 @@ ${m[3]}`);
 
 // The two Length Check tables (left and right) get the same column widths: each part (position, SPEC, each sample) takes the average
 // of its two widths, shared out over that part's columns in proportion to what they were
-const POSITION_GROW = 1.35;
-const SPEC_GROW = 1.33;
+// (Customize UI › PDF / Excel can change both: pdfPosW / pdfSpecW, in %; defaults 135 and 133)
 // Length Position: the same size as the samples (10), smaller when the name is too long for its box so that all of it shows
 // (at size 10 a box of width w — in column width units — holds about w x 1.05 characters)
-const positionSize = (t, width) => Math.max(6, Math.min(10, Math.floor(10 * width * 1.05 / t.length * 2) / 2));
+const positionSize = (t, width, max = 10) => Math.max(6, Math.min(max, Math.floor(10 * width * 1.05 / t.length * 2) / 2));
 // Width of the columns a..b of the sheet (from its <cols>)
 function colsWidth(sheet, [a, b]) {
   let t = 0;
@@ -202,7 +217,8 @@ function colsWidth(sheet, [a, b]) {
   }
   return t;
 }
-function equalizeLengthTables(sheet) {
+function equalizeLengthTables(sheet, opt = PDF_DEFAULT) {
+  const POSITION_GROW = opt.pdfPosW / 100, SPEC_GROW = opt.pdfSpecW / 100;
   const m = sheet.match(/<cols>([\s\S]*?)<\/cols>/);
   if (!m) return sheet;
   const cols = [];   // per column: [attributes without min/max/width, width]
@@ -277,13 +293,13 @@ const charW = ch => CHAR_W[ch] ?? 722;
 // ends as far from the Result box as it starts from the box's left line. In Excel C:AB is 383.25pt and A:B 18pt, the text
 // 12pt Times New Roman: 383.25 - 18 - 2 x 1.5 (cell padding) = 362.25pt = 30190 / 1000 em (re-measure if the column widths change)
 const MATERIAL_LINE_WIDTH = 30190;
-function wrapLine(line) {
+function wrapLine(line, maxW = MATERIAL_LINE_WIDTH) {
   const out = [];
   let rest = String(line);
   for (;;) {
     // how many characters fit
     let n = 0, w = 0;
-    while (n < rest.length && w + charW(rest[n]) <= MATERIAL_LINE_WIDTH) w += charW(rest[n++]);
+    while (n < rest.length && w + charW(rest[n]) <= maxW) w += charW(rest[n++]);
     if (n >= rest.length) break;
     const head = rest.slice(0, n);
     // a space just past the edge still lets the line end there (it is not printed); a "," ";" "+" must fit
@@ -309,7 +325,7 @@ const makeContinuationPage = prev => ({ ...prev, material: { wire: '/', terminal
 // Returns the (possibly longer) pages array with material text re-split, and which "pageIndex:materialKey"
 // pairs are a continuation (so their Result stays blank there instead of showing "/" or repeating page 1's).
 const MAX_PAGES = 50;
-function splitMaterialOverflow(pages) {
+function splitMaterialOverflow(pages, maxW = MATERIAL_LINE_WIDTH) {
   const continued = new Set();
   pages = pages.map(d => ({ ...d, material: { ...(d.material || {}) } }));
   for (const k of Object.keys(MATERIAL_ROWS)) {
@@ -318,7 +334,7 @@ function splitMaterialOverflow(pages) {
     while (p < pages.length) {
       const text = pages[p].material[k];
       if (!text || text === '/') break;
-      const lines = String(text).split(/\r?\n/).flatMap(wrapLine);
+      const lines = String(text).split(/\r?\n/).flatMap(l => wrapLine(l, maxW));
       if (lines.length <= rows) break;
       pages[p].material[k] = lines.slice(0, rows).join('\n');
       const rest = lines.slice(rows).join('\n');
@@ -337,7 +353,7 @@ function splitMaterialOverflow(pages) {
 // ---- OQC Data Information: values pasted into the template's own cells, nothing else changed ----
 function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   const set = (ref, v) => { sheet = setCell(sheet, ref, v); };
-  sheet = equalizeLengthTables(sheet);
+  sheet = equalizeLengthTables(sheet, ctx.opt);
   const items = d.items || {};
   // Form reference, as on the paper form (the First Lot form keeps the template's own)
   // (it starts further left than the template's own cell: the Length Check columns are narrower, and the line would run past the page)
@@ -362,7 +378,7 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     // Not used ("/"): no text, a line shape is drawn over the box instead (see addMaterialLines)
     if (String((d.material || {})[k] || '') === '/') continue;
     if (textBoxes) continue;
-    const lines = String((d.material || {})[k] || '').split(/\r?\n/).flatMap(wrapLine);
+    const lines = String((d.material || {})[k] || '').split(/\r?\n/).flatMap(l => wrapLine(l, ctx.matWidth));
     if (lines.length > rows.length) lines.splice(rows.length - 1, lines.length - rows.length + 1, lines.slice(rows.length - 1).join(' '));
     // every line takes the font of the first line (the lower rows of a box are set smaller in the template), but keeps
     // its own borders: the last row carries the box's bottom (double) line, which copying the first row's whole style erased
@@ -402,14 +418,14 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
       const r = FIRST_LEN_ROW + i;
       side.samples.forEach(([c1, c2]) => centerBox(c1, c2, r));
       if (!l) continue;
-      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: positionSize(String(l.position).trim(), posWidth), font: 'Cambria' } : '');
+      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: positionSize(String(l.position).trim(), posWidth, ctx.opt.pdfPosFont), font: 'Cambria' } : '');
       sheet = setSpec(sheet, side, r, l.spec, ctx);
       side.samples.forEach(([c1], k) => set(`${c1}${r}`, exactNum((l.samples || [])[k])));
     }
     // ④⑤ "/": the columns and rows stay as they are; the line is a shape over them (see addMaterialLines)
     // Result row: one result under each sample ① .. ⑤ (records saved before that have one result for the whole table)
     side.samples.forEach(([c1, c2]) => centerBox(c1, c2, RESULT_ROW));
-    if (Array.isArray(res)) side.samples.forEach(([c1], k) => set(`${c1}${RESULT_ROW}`, slash && k >= 3 || !res[k] ? '' : { text: String(res[k]), size: 9, font: 'Times New Roman' }));   // every result the same size   // ④⑤ "/": the line crosses the Result row instead of a "/" text
+    if (Array.isArray(res)) side.samples.forEach(([c1], k) => set(`${c1}${RESULT_ROW}`, slash && k >= 3 || !res[k] ? '' : { text: String(res[k]), size: ctx.opt.pdfResFont, font: 'Times New Roman' }));   // every result the same size   // ④⑤ "/": the line crosses the Result row instead of a "/" text
     else set(`${side.samples[0][0]}${RESULT_ROW}`, res);
   });
   // Footer: remarks, total determination, checked by, inspector
@@ -421,7 +437,53 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   set('AD43', d.total);
   set('AK43', d.checkedBy);
   set('AQ43', d.inspector);
+  return resizeOqcCells(sheet, ctx);
+}
+
+// Customize UI › PDF / Excel: font sizes and the Length Check row height. Only values changed from the default are applied,
+// so with nothing changed every cell keeps the template's own size (some boxes differ a little row to row).
+function resizeOqcCells(sheet, ctx) {
+  const o = ctx.opt, ch = k => ctx.changed.has(k);
+  const resize = (refs, size) => {
+    for (const ref of refs) { const s = styleOf(sheet, ref); if (s !== undefined) sheet = useStyle(sheet, ref, sizedStyle(ctx, s, size)); }
+  };
+  const lenRows = Array.from({ length: ROWS }, (_, i) => FIRST_LEN_ROW + i);
+  if (ch('pdfCustFont')) resize(['A7', 'I7'], o.pdfCustFont);
+  if (ch('pdfInfoFont')) resize(['U7', 'AB7', 'AI7', 'AP7'], o.pdfInfoFont);
+  if (ch('pdfMatFont')) resize(Object.values(MATERIAL_ROWS).flat().map(r => `C${r}`), o.pdfMatFont);
+  if (ch('pdfSmpFont')) resize([LEFT, RIGHT].flatMap(side => side.samples.flatMap(([c1]) => lenRows.map(r => `${c1}${r}`))), o.pdfSmpFont);
+  if (ch('pdfItemResFont')) resize([...Object.values(MATERIAL_RESULT), ...ITEM_ROWS.map(r => `AT${r}`)], o.pdfItemResFont);
+  if (ch('pdfFootFont')) resize(['A43', 'AD43', 'AK43', 'AQ43'], o.pdfFootFont);
+  if (ch('pdfLenRowH')) for (const r of lenRows) {
+    sheet = sheet.replace(new RegExp(`<row r="${r}"((?:\\s+[\\w:]+="[^"]*")*)`), (m, a) =>
+      `<row r="${r}"${a.replace(/\s+(?:ht|customHeight)="[^"]*"/g, '')} ht="${o.pdfLenRowH}" customHeight="1"`);
+  }
   return sheet;
+}
+
+// Width of one material line (see MATERIAL_LINE_WIDTH) with these options: the text area C:AB gets wider or narrower with the
+// Length Check column widths, and a bigger font fits fewer characters
+let tplSheetCache = null;
+async function oqcTemplateSheet() {
+  const mtime = fs.statSync(TEMPLATES.oqc.file).mtimeMs;
+  if (tplSheetCache && tplSheetCache.mtime === mtime) return tplSheetCache.xml;
+  const zip = await JSZip.loadAsync(fs.readFileSync(TEMPLATES.oqc.file));
+  const wb = await zip.file('xl/workbook.xml').async('string'), rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+  const tag = [...wb.matchAll(/<sheet\b[^>]*\/>/g)].map(m => m[0]).find(t => t.includes(`name="${TEMPLATES.oqc.sheet}"`));
+  const id = tag.match(/\br:id="([^"]+)"/)[1];
+  const rel = [...rels.matchAll(/<Relationship\b[^>]*\/>/g)].map(m => m[0]).find(t => t.includes(`Id="${id}"`));
+  const xml = await zip.file('xl/' + rel.match(/Target="([^"]+)"/)[1].replace(/^\/?xl\//, '')).async('string');
+  tplSheetCache = { mtime, xml };
+  return xml;
+}
+async function materialLineWidth(opt, changed) {
+  let w = MATERIAL_LINE_WIDTH;
+  if (changed.has('pdfPosW') || changed.has('pdfSpecW')) {
+    const tpl = await oqcTemplateSheet(), area = ['C', 'AB'];
+    w *= colsWidth(equalizeLengthTables(tpl, opt), area) / colsWidth(equalizeLengthTables(tpl, PDF_DEFAULT), area);
+  }
+  if (changed.has('pdfMatFont')) w *= 12 / opt.pdfMatFont;
+  return Math.round(w);
 }
 
 
@@ -540,13 +602,14 @@ function fillSpecSheet(sheet, d, ctx) {
 // ---- Build a workbook from a template file: one copy of its sheet per page, values written into the XML ----
 // fill(sheetXml, page, drawingXml, ctx) -> { sheet, drawing }. Everything else in the template (styles, merges, borders, shapes,
 // print setup) is copied as it is. A template file with several sheets keeps only the wanted one.
-async function buildSheetWorkbook(tpl, pages, fill) {
+async function buildSheetWorkbook(tpl, pages, fill, opts = {}) {
   const zip = await JSZip.loadAsync(fs.readFileSync(tpl.file));
   const read = p => zip.file(p).async('string');
   let wb = await read('xl/workbook.xml');
   let wbRels = await read('xl/_rels/workbook.xml.rels');
   let types = await read('[Content_Types].xml');
-  const ctx = { styles: await read('xl/styles.xml') };   // cell styles; a fill may add styles (centered text, a diagonal line)
+  // cell styles (a fill may add styles: centered text, a diagonal line, another font size) and the Customize UI options
+  const ctx = { styles: await read('xl/styles.xml'), opt: opts.opt || PDF_DEFAULT, changed: opts.changed || new Set(), matWidth: opts.matWidth || MATERIAL_LINE_WIDTH };
   const relTag = id => wbRels.match(new RegExp(`<Relationship\\b[^>]*\\bId="${id}"[^>]*/>`))[0];
   const partOf = rel => 'xl/' + rel.match(/Target="([^"]+)"/)[1].replace(/^\/?xl\//, '');
   const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -654,11 +717,17 @@ async function buildSpecWorkbook(pages) {
 
 // kind: 'oqc' (OQC Data Information) or 'spec' (SPEC page); pages: page objects with named fields
 // (as saved by OQC Data Information); itemList: [[Khmer, English], ...] for items 3)-11)
-async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
+// pdfOptions: Customize UI › PDF / Excel values (see pdf-options.js); only those changed from the default do anything
+async function buildOqcWorkbook(pages, itemList, kind = 'oqc', pdfOptions = {}) {
   if (kind === 'spec') return buildSpecWorkbook(pages);
+  const given = cleanPdfOptions(pdfOptions);
+  const opt = { ...PDF_DEFAULT, ...given };
+  const changed = new Set(Object.keys(given).filter(k => given[k] !== PDF_DEFAULT[k]));
+  const matWidth = await materialLineWidth(opt, changed);
+  const build = { opt, changed, matWidth };
   // Material text too long for page 1's rows spills onto the next page, same box, continuing at the top —
   // adding that page if the record doesn't already have one (print only; the saved record is unchanged)
-  const { pages: splitPages, continued } = splitMaterialOverflow(pages);
+  const { pages: splitPages, continued } = splitMaterialOverflow(pages, matWidth);
   // Pages 2, 3, ... (SPEC lines 23-44, 45-66, ...) show "/" for the Wire / Terminal / Housing / Other text and results;
   // on page 1 a material whose result is "/" (not used) shows "/" as its text too; a page holding the overflow of a
   // page 1 material shows that text with a blank Result (not "/", and not page 1's result repeated)
@@ -678,10 +747,10 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc') {
         else sheet = setCell(sheet, MATERIAL[k].split(':')[0], text);
       }
       return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing: addMaterialLines(drawing, d, itemList) };
-    });
+    }, build);
     return stackPages(buf, pages[0].partNo);
   }
-  const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing: addMaterialLines(drawing, d, itemList) }));
+  const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing: addMaterialLines(drawing, d, itemList) }), build);
   return stackPages(buf, pages[0].partNo);
 }
 
