@@ -271,6 +271,19 @@ function equalizeLengthTables(sheet, opt = PDF_DEFAULT) {
     const target = (sum(matRes) + sum(itemRes)) / 2;
     for (const ix of [matRes, itemRes]) { const f = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
   }
+  // Customize UI › PDF / Excel: № column, sample and Result box widths. Nothing gives way for them: the sheet gets wider and
+  // stackPages' page scale shrinks to keep one A4 page. The Inspection point Result box (AT:AV) is the right table's sample ⑤,
+  // so it follows the sample width, and the Material Result box (AC:AE) is kept the same width as it.
+  {
+    const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
+    const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
+    const scale = (ix, f) => { if (f !== 1) for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; };
+    scale([...idx(['A', 'B']), ...idx(['Y', 'Z'])], opt.pdfNoW / 100);
+    scale([LEFT, RIGHT].flatMap(side => side.samples.flatMap(idx)), opt.pdfSmpW / 100);
+    const matRes = idx(['AC', 'AE']), itemRes = idx(RIGHT.samples[4]);
+    scale(matRes, sum(itemRes) / sum(matRes));
+    scale([...matRes, ...itemRes], opt.pdfResW / 100);
+  }
   const out = cols.map((c, i) => c && `<col min="${i}" max="${i}" width="${c[1]}"${c[0]}/>`).filter(Boolean).join('');
   return sheet.replace(m[0], `<cols>${out}${(m[1].match(/<col\b[^>]*\bmin="\d{3,}"[^>]*\/>/g) || []).join('')}</cols>`);
 }
@@ -463,23 +476,26 @@ function resizeOqcCells(sheet, ctx) {
 
 // Width of one material line (see MATERIAL_LINE_WIDTH) with these options: the text area C:AB gets wider or narrower with the
 // Length Check column widths, and a bigger font fits fewer characters
-let tplSheetCache = null;
-async function oqcTemplateSheet() {
-  const mtime = fs.statSync(TEMPLATES.oqc.file).mtimeMs;
-  if (tplSheetCache && tplSheetCache.mtime === mtime) return tplSheetCache.xml;
-  const zip = await JSZip.loadAsync(fs.readFileSync(TEMPLATES.oqc.file));
+const tplSheetCache = {};
+// The sheet XML a template's pages are made from (cached until the template file changes)
+async function templateSheet(tpl) {
+  const mtime = fs.statSync(tpl.file).mtimeMs, hit = tplSheetCache[tpl.file];
+  if (hit && hit.mtime === mtime) return hit.xml;
+  const zip = await JSZip.loadAsync(fs.readFileSync(tpl.file));
   const wb = await zip.file('xl/workbook.xml').async('string'), rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
-  const tag = [...wb.matchAll(/<sheet\b[^>]*\/>/g)].map(m => m[0]).find(t => t.includes(`name="${TEMPLATES.oqc.sheet}"`));
+  const tags = [...wb.matchAll(/<sheet\b[^>]*\/>/g)].map(m => m[0]);
+  const tag = tpl.sheet ? tags.find(t => t.includes(`name="${tpl.sheet}"`)) : tags[0];
   const id = tag.match(/\br:id="([^"]+)"/)[1];
   const rel = [...rels.matchAll(/<Relationship\b[^>]*\/>/g)].map(m => m[0]).find(t => t.includes(`Id="${id}"`));
   const xml = await zip.file('xl/' + rel.match(/Target="([^"]+)"/)[1].replace(/^\/?xl\//, '')).async('string');
-  tplSheetCache = { mtime, xml };
+  tplSheetCache[tpl.file] = { mtime, xml };
   return xml;
 }
+const WIDTH_KEYS = ['pdfPosW', 'pdfSpecW', 'pdfNoW', 'pdfSmpW', 'pdfResW'];
 async function materialLineWidth(opt, changed) {
   let w = MATERIAL_LINE_WIDTH;
-  if (changed.has('pdfPosW') || changed.has('pdfSpecW')) {
-    const tpl = await oqcTemplateSheet(), area = ['C', 'AB'];
+  if (WIDTH_KEYS.some(k => changed.has(k))) {
+    const tpl = await templateSheet(TEMPLATES.oqc), area = ['C', 'AB'];
     w *= colsWidth(equalizeLengthTables(tpl, opt), area) / colsWidth(equalizeLengthTables(tpl, PDF_DEFAULT), area);
   }
   if (changed.has('pdfMatFont')) w *= 12 / opt.pdfMatFont;
@@ -725,6 +741,8 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc', pdfOptions = {}) 
   const changed = new Set(Object.keys(given).filter(k => given[k] !== PDF_DEFAULT[k]));
   const matWidth = await materialLineWidth(opt, changed);
   const build = { opt, changed, matWidth };
+  // Column widths changed: the page scale is worked out from the default layout's width (see stackPages)
+  const refWidth = async tpl => WIDTH_KEYS.some(k => changed.has(k)) ? sheetWidthPt(equalizeLengthTables(await templateSheet(tpl), PDF_DEFAULT)) : 0;
   // Material text too long for page 1's rows spills onto the next page, same box, continuing at the top —
   // adding that page if the record doesn't already have one (print only; the saved record is unchanged)
   const { pages: splitPages, continued } = splitMaterialOverflow(pages, matWidth);
@@ -748,10 +766,10 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc', pdfOptions = {}) 
       }
       return { sheet: fillOqcSheet(sheet, d, itemList, ctx, true), drawing: addMaterialLines(drawing, d, itemList) };
     }, build);
-    return stackPages(buf, pages[0].partNo);
+    return stackPages(buf, pages[0].partNo, await refWidth(TEMPLATES.spec));
   }
   const buf = await buildSheetWorkbook(TEMPLATES.oqc, pages, (sheet, d, drawing, ctx) => ({ sheet: fillOqcSheet(sheet, d, itemList, ctx), drawing: addMaterialLines(drawing, d, itemList) }), build);
-  return stackPages(buf, pages[0].partNo);
+  return stackPages(buf, pages[0].partNo, await refWidth(TEMPLATES.oqc));
 }
 
 // ---- All pages on one worksheet, like the paper files (e.g. "KM (ADXDN ).xlsx"): page 1 is rows 1-43, page 2 rows 44-86, ...
@@ -761,7 +779,19 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc', pdfOptions = {}) 
 const PAGE_ROWS = 43, LAST_COL = 48;   // template print area A1:AV43
 const A4 = { w: 595.3, h: 841.9 };     // points
 
-async function stackPages(buf, sheetName) {
+// Printed width (pt at 100%) of a sheet's columns A..AV, as Excel turns column widths into pixels
+function sheetWidthPt(sheet) {
+  const widths = Array(LAST_COL + 1).fill(+(sheet.match(/<sheetFormatPr\b[^>]*defaultColWidth="([\d.]+)"/) || [, 9])[1]);
+  for (const m of sheet.matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bwidth="([\d.]+)"[^>]*\/>/g)) {
+    for (let c = +m[1]; c <= Math.min(+m[2], LAST_COL); c++) widths[c] = +m[3];
+  }
+  const hidden = new Set([...sheet.matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bhidden="1"/g)].flatMap(m => Array.from({ length: m[2] - m[1] + 1 }, (_, k) => +m[1] + k)));
+  let w = 0;
+  for (let c = 1; c <= LAST_COL; c++) if (!hidden.has(c)) w += Math.trunc((256 * widths[c] + Math.trunc(128 / 7)) / 256 * 7) * 0.75;
+  return w;
+}
+
+async function stackPages(buf, sheetName, refWPt = 0) {
   const zip = await JSZip.loadAsync(buf);
   const read = p => zip.file(p).async('string');
   let wb = await read('xl/workbook.xml'), wbRels = await read('xl/_rels/workbook.xml.rels'), types = await read('[Content_Types].xml');
@@ -801,13 +831,7 @@ async function stackPages(buf, sheetName) {
 
   // One print page per 43 rows: no fit-to-page (Excel ignores page breaks with it); one scale that fits a page on A4
   const sheet0 = first.sheet;
-  const widths = Array(LAST_COL + 1).fill(+(sheet0.match(/<sheetFormatPr\b[^>]*defaultColWidth="([\d.]+)"/) || [, 9])[1]);
-  for (const m of sheet0.matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bwidth="([\d.]+)"[^>]*\/>/g)) {
-    for (let c = +m[1]; c <= Math.min(+m[2], LAST_COL); c++) widths[c] = +m[3];
-  }
-  const hidden = new Set([...sheet0.matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bhidden="1"/g)].flatMap(m => Array.from({ length: m[2] - m[1] + 1 }, (_, k) => +m[1] + k)));
-  let wPt = 0;
-  for (let c = 1; c <= LAST_COL; c++) if (!hidden.has(c)) wPt += Math.trunc((256 * widths[c] + Math.trunc(128 / 7)) / 256 * 7) * 0.75;
+  const wPt = sheetWidthPt(sheet0);
   const defH = +(sheet0.match(/<sheetFormatPr\b[^>]*defaultRowHeight="([\d.]+)"/) || [, 15])[1];
   const heights = {};
   for (const m of sheet0.matchAll(/<row r="(\d+)"[^>]*?\bht="([\d.]+)"/g)) heights[m[1]] = +m[2];
@@ -816,7 +840,11 @@ async function stackPages(buf, sheetName) {
   const mg = sheet0.match(/<pageMargins\b[^>]*\/>/);
   const margin = k => +((mg && mg[0].match(new RegExp(`\\b${k}="([\\d.]+)"`))) || [, 0])[1] * 72;
   const tplScale = +(sheet0.match(/<pageSetup\b[^>]*\bscale="(\d+)"/) || [, 100])[1];
-  const scale = Math.max(10, Math.min(tplScale, Math.floor(100 * Math.min(
+  // refWPt: the width of the default layout, which the template's own scale was set to fit on the page. A sheet made wider
+  // (Customize UI column widths) scales down by the same ratio: that keeps the template's room for the printer's edge,
+  // which the plain A4 sum below does not know about (with 0 margins it lets a wider sheet spill onto a second page)
+  const widthScale = refWPt > 0 && wPt > refWPt ? Math.floor(tplScale * refWPt / wPt) : tplScale;
+  const scale = Math.max(10, Math.min(tplScale, widthScale, Math.floor(100 * Math.min(
     (A4.w - margin('left') - margin('right')) / wPt, (A4.h - margin('top') - margin('bottom')) / hPt))));
 
   const last = PAGE_ROWS * n;
