@@ -6,6 +6,15 @@ const { config } = require('../config');
 const path = require('path');
 const { sql, getPool } = require('../db');
 const { recordFile, saveRecordFile } = require('../record-files');
+const { loadUiSettings } = require('./ui-settings');
+const { getPerms } = require('../permissions');
+
+// Customize UI › PDF / Excel sizes for this download: the saved ones, or — for the "Test" buttons on the Customize UI
+// page — the values being tried there (body.pdfPreview), only for a user who may change them
+async function pdfOptionsFor(session, body) {
+  if (body && body.pdfPreview && typeof body.pdfPreview === 'object' && (await getPerms(session)).includes('ui.edit')) return body.pdfPreview;
+  return (await loadUiSettings()).settings;
+}
 
 // Printer the PDF button sends to (override with "pdfPrinter" in config/<env>.json)
 const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
@@ -28,7 +37,7 @@ async function readExportRequest(req, res, session, ext) {
   const itemList = Array.isArray(body.itemList) ? body.itemList.slice(0, 9).map(x => [String(x[0] ?? ''), String(x[1] ?? '')]) : [];
   if (!pages.length || pages.length > 50 || pages.some(p => !p || typeof p !== 'object')) { sendJson(res, 400, { error: 'Invalid request' }); return null; }
   const name = ((pages[0].qty ? partQtyName(pages[0]) : '') || String(body.fileName || 'OQC').replace(/[^\w.-]+/g, '_').slice(0, 80) || 'OQC') + ext;
-  return { pages, itemList, name };
+  return { pages, itemList, name, pdf: await pdfOptionsFor(session, body) };
 }
 
 function sendFile(res, buf, name, type) {
@@ -47,7 +56,7 @@ async function handleOqcExcel(req, res, session, kind) {
   const r = await readExportRequest(req, res, session, '.xlsx');
   if (!r) return;
   try {
-    sendFile(res, await buildOqcWorkbook(r.pages, r.itemList, kind), r.name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    sendFile(res, await buildOqcWorkbook(r.pages, r.itemList, kind, r.pdf), r.name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   } catch (err) {
     console.error('Excel export error:', err.message);
     sendJson(res, 500, { error: 'Could not create the Excel file' });
@@ -61,7 +70,7 @@ async function handleOqcPdf(req, res, session) {
   if (!r) return;
   const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qc-pdf-'));
   try {
-    const saved = await printXlsx(await buildOqcWorkbook(r.pages, r.itemList, 'oqc'), PDF_PRINTER, dir, pdfBase());
+    const saved = await printXlsx(await buildOqcWorkbook(r.pages, r.itemList, 'oqc', r.pdf), PDF_PRINTER, dir, pdfBase());
     sendFile(res, fs.readFileSync(saved), r.name, 'application/pdf');
   } catch (err) {
     console.error('PDF print error:', err.message);
@@ -91,16 +100,19 @@ async function handleRecordExport(req, res, session, id, kind) {
     const file = recordFile(id, ext);
     // A stored file made before the templates or the builder last changed is made again, so template changes show up
     const stale = f => { try { return fs.statSync(file).mtimeMs < fs.statSync(f).mtimeMs; } catch { return false; } };
-    const outdated = [path.join(__dirname, '..', 'excel-builder.js'), ...fs.readdirSync(path.join(__dirname, '..', '..', 'templates')).map(n => path.join(__dirname, '..', '..', 'templates', n))].some(stale);
+    // (and one made before the PDF / Excel sizes in Customize UI were last saved)
+    const ui = await loadUiSettings();
+    const outdated = [path.join(__dirname, '..', 'excel-builder.js'), ...fs.readdirSync(path.join(__dirname, '..', '..', 'templates')).map(n => path.join(__dirname, '..', '..', 'templates', n))].some(stale)
+      || !!(ui.updatedAt && fs.existsSync(file) && fs.statSync(file).mtimeMs < new Date(ui.updatedAt).getTime());
     if (rec.printed && fs.existsSync(file) && !outdated) return sendFile(res, fs.readFileSync(file), name, type);
 
     const pages = JSON.parse(rec.Data);
     let buf;
     if (isPdf) {
       const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qc-pdf-'));
-      try { buf = fs.readFileSync(await printXlsx(await buildOqcWorkbook(pages, itemList, 'oqc'), PDF_PRINTER, dir, pdfBase())); }
+      try { buf = fs.readFileSync(await printXlsx(await buildOqcWorkbook(pages, itemList, 'oqc', ui.settings), PDF_PRINTER, dir, pdfBase())); }
       finally { fs.rmSync(dir, { recursive: true, force: true }); }
-    } else buf = await buildOqcWorkbook(pages, itemList, 'oqc');
+    } else buf = await buildOqcWorkbook(pages, itemList, 'oqc', ui.settings);
     saveRecordFile(id, ext, buf);
     // Printed only if the record is still the one the file was made from; a save in the meantime keeps it Draft
     const { rowsAffected } = await pool.request().input('id', sql.Int, id).input('upd', sql.DateTime, rec.UpdateDate).query(

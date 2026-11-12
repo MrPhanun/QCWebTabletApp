@@ -9,14 +9,15 @@ const PERMS = [
   'spec.view', 'spec.add', 'spec.edit', 'spec.delete', 'spec.excel',
   'daily.view', 'daily.add', 'daily.edit', 'daily.delete', 'daily.excel', 'daily.special',
   'users.view', 'users.add', 'users.edit', 'users.delete',
-  'roles.view', 'roles.edit'
+  'roles.view', 'roles.edit',
+  'ui.view', 'ui.edit'
 ];
 // Rules for users who were never customised: everyone views and downloads Excel, QC department adds / edits / deletes,
 // Admin role manages users and permissions (same as before permissions existed)
 function defaultPerms(role, dept) {
   const p = ['sampling.view', 'spec.view', 'spec.excel', 'daily.view', 'daily.excel'];
   if (isQC(dept)) p.push('sampling.add', 'sampling.edit', 'sampling.delete', 'spec.add', 'spec.edit', 'spec.delete', 'daily.add', 'daily.edit', 'daily.delete', 'daily.special');
-  if (role === 'Admin') p.push('users.view', 'users.add', 'users.edit', 'users.delete', 'roles.view', 'roles.edit');
+  if (role === 'Admin') p.push('users.view', 'users.add', 'users.edit', 'users.delete', 'roles.view', 'roles.edit', 'ui.view', 'ui.edit');
   return p;
 }
 // Effective permissions of a signed-in user (read on every request, so changes apply without logging in again)
@@ -38,6 +39,8 @@ function permFor(urlPath, method) {
   if (urlPath === '/api/excel/spec') return 'spec.excel';
   if (/^\/api\/users(\/[^/]+)?$/.test(urlPath)) return by({ GET: 'users.view', POST: 'users.add', PUT: 'users.edit', DELETE: 'users.delete' });
   if (urlPath === '/api/permissions') return by({ GET: 'roles.view', PUT: 'roles.edit' });
+  // The OQC screen reads the saved look too, so GET is open to anyone who can see it
+  if (urlPath === '/api/ui-settings') return by({ GET: ['daily.view', 'ui.view'], PUT: 'ui.edit' });
   return null;
 }
 

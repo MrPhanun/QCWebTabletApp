@@ -357,3 +357,41 @@ table.data.frz th:nth-child(1), table.data.frz td:nth-child(1) { left: 0; min-wi
 table.data.frz th:last-child, table.data.frz td:last-child { right: 0; box-shadow: -1px 0 0 var(--line); }
 table.data.frz tbody tr:hover td:nth-child(1), table.data.frz tbody tr:hover td:last-child { background: #F1FCF6; }
 table.data.frz td.empty-row { position: static; min-width: 0; max-width: none; box-shadow: none; }
+
+/* Administration › Customize UI: settings on the left, live preview of the OQC sheet on the right */
+.cz-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 12px; }
+.cz-side { display: grid; gap: 12px; max-height: calc(100vh - 210px); overflow: auto; padding-right: 4px; }
+.cz-group { padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.7); }
+.cz-group h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--accent-1); text-transform: uppercase; letter-spacing: .4px; }
+.cz-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 26px; align-items: center; gap: 6px 8px; padding: 5px 0; border-top: 1px dashed var(--line); }
+.cz-group h3 + .cz-row { border-top: 0; }
+.cz-label { grid-column: 1 / -1; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.cz-row.changed .cz-label::after { content: " ●"; color: #d97706; }
+.cz-ctl { grid-column: 1 / 3; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cz-ctl input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent-1); }
+.cz-ctl .cz-num { width: 64px; height: 30px; padding: 0 6px; border: 1.5px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; text-align: right; }
+.cz-ctl select { flex: 1; height: 32px; padding: 0 8px; border: 1.5px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; background: #fff; }
+.cz-ctl input[type="color"] { width: 44px; height: 30px; padding: 2px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+.cz-unit, .cz-hex { font-size: 12px; font-weight: 600; color: var(--ink-soft); min-width: 18px; }
+.cz-reset { width: 26px; height: 26px; border: 0; border-radius: 8px; background: rgba(5,150,105,.08); color: var(--ink-soft); font-size: 14px; cursor: pointer; visibility: hidden; }
+.cz-row.changed .cz-reset { visibility: visible; }
+.cz-reset:hover:not(:disabled) { background: rgba(5,150,105,.18); color: var(--accent-1); }
+.cz-reset:disabled { cursor: not-allowed; opacity: .5; }
+.cz-main { min-width: 0; }
+.cz-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cz-bar .spacer { flex: 1; }
+.cz-bar .msg { margin: 0; }
+.cz-bar .btn-primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.cz-state { padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.cz-state[data-state="saved"] { background: #d1fae5; color: #065f46; }
+.cz-state[data-state="changed"] { background: #fef3c7; color: #92400e; }
+.cz-state[data-state="changed"]::before { content: "● "; }
+.cz-preview-title { margin-bottom: 6px; font-size: 12px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .4px; }
+.ui-preview { pointer-events: none; user-select: none; overflow-x: auto; }
+@media (max-width: 1100px) {
+  .cz-layout { grid-template-columns: minmax(0, 1fr); }
+  .cz-side { max-height: none; overflow: visible; padding-right: 0; }
+}
+.cz-note { margin: 8px 0 6px; font-size: 12px; color: var(--ink-soft); line-height: 1.45; }
+.cz-test { display: flex; flex-wrap: wrap; gap: 6px; }
+.cz-test .icon-btn { height: 32px; }

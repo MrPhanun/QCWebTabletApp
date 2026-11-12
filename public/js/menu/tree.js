@@ -14,7 +14,8 @@ const MENU = [
   ]},
   { id: 'admin', k: 'm.admin', icon: 'shield', children: [
     { id: 'users', k: 'm.users', icon: 'users', perm: 'users.view' },
-    { id: 'roles', k: 'm.roles', icon: 'lock', perm: 'roles.view' }
+    { id: 'roles', k: 'm.roles', icon: 'lock', perm: 'roles.view' },
+    { id: 'customize', k: 'm.customize', icon: 'cog', perm: 'ui.view' }
   ]}
 ];
 

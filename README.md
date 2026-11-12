@@ -22,6 +22,7 @@ server/
     excel.js               /api/excel/oqc, /api/excel/spec    Excel download
     users.js               /api/users, /api/user/name         Administration › User Management
     permissions.js         /api/permissions       Administration › Roles & Permissions
+    ui-settings.js         /api/ui-settings       Administration › Customize UI (look of OQC Data Information)
 
 public/                    Everything the browser loads
   login.html, menu.html, home.html, favicon.ico
