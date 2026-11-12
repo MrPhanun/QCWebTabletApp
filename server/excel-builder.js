@@ -261,28 +261,22 @@ function equalizeLengthTables(sheet, opt = PDF_DEFAULT) {
     for (const ix of [spec, idx(RIGHT.spec)]) for (const i of ix) cols[i][1] = Math.round(cols[i][1] * SPEC_GROW * 1000) / 1000;
     for (const ix of [idx(LEFT.pos), idx([RIGHT.pos[0], 'AB'])]) { const f = (sum(ix) - add) / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
   }
-  // The Result box of 1) Material check (AC:AE) and of 3) Inspection point (AT:AV, the same columns as sample ⑤)
-  // sit above this table but share its columns: match their width too (this can throw off their match with the
-  // position/sample groups above, since AC:AE is also part of RIGHT.pos and AT:AV is also RIGHT.samples[4])
-  {
-    const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
-    const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
-    const matRes = idx(['AC', 'AE']), itemRes = idx(RIGHT.samples[4]);
-    const target = (sum(matRes) + sum(itemRes)) / 2;
-    for (const ix of [matRes, itemRes]) { const f = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
-  }
-  // Customize UI › PDF / Excel: № column, sample and Result box widths. Nothing gives way for them: the sheet gets wider and
-  // stackPages' page scale shrinks to keep one A4 page. The Inspection point Result box (AT:AV) is the right table's sample ⑤,
-  // so it follows the sample width, and the Material Result box (AC:AE) is kept the same width as it.
+  // Customize UI › PDF / Excel: № column and sample widths. Nothing gives way for them: the sheet gets wider and
+  // stackPages' page scale shrinks to keep one A4 page.
+  // Then the Result boxes, which sit above the right table and share its columns: 3) Inspection point's (AT:AV) is the right
+  // table's sample ⑤, so it stays a sample's width (all ten sample columns alike), and 1) Material check's (AC:AE, the tail
+  // of the right Length Position) is made the same width as it. The rest of the right Length Position (AA:AB) then makes up
+  // the difference, so the right Length Position is as wide as the left one.
   {
     const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
     const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
     const scale = (ix, f) => { if (f !== 1) for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; };
     scale([...idx(['A', 'B']), ...idx(['Y', 'Z'])], opt.pdfNoW / 100);
     scale([LEFT, RIGHT].flatMap(side => side.samples.flatMap(idx)), opt.pdfSmpW / 100);
-    const matRes = idx(['AC', 'AE']), itemRes = idx(RIGHT.samples[4]);
+    const matRes = idx(['AC', 'AE']), itemRes = idx(RIGHT.samples[4]), rest = idx([RIGHT.pos[0], 'AB']);
     scale(matRes, sum(itemRes) / sum(matRes));
-    scale([...matRes, ...itemRes], opt.pdfResW / 100);
+    // (at least 1.5 wide: very wide samples with a narrow Length Position leave the right one a little wider instead)
+    scale(rest, Math.max(1.5, sum(idx(LEFT.pos)) - sum(matRes)) / sum(rest));
   }
   const out = cols.map((c, i) => c && `<col min="${i}" max="${i}" width="${c[1]}"${c[0]}/>`).filter(Boolean).join('');
   return sheet.replace(m[0], `<cols>${out}${(m[1].match(/<col\b[^>]*\bmin="\d{3,}"[^>]*\/>/g) || []).join('')}</cols>`);
@@ -491,15 +485,24 @@ async function templateSheet(tpl) {
   tplSheetCache[tpl.file] = { mtime, xml };
   return xml;
 }
-const WIDTH_KEYS = ['pdfPosW', 'pdfSpecW', 'pdfNoW', 'pdfSmpW', 'pdfResW'];
-async function materialLineWidth(opt, changed) {
-  let w = MATERIAL_LINE_WIDTH;
-  if (WIDTH_KEYS.some(k => changed.has(k))) {
-    const tpl = await templateSheet(TEMPLATES.oqc), area = ['C', 'AB'];
-    w *= colsWidth(equalizeLengthTables(tpl, opt), area) / colsWidth(equalizeLengthTables(tpl, PDF_DEFAULT), area);
+const WIDTH_KEYS = ['pdfPosW', 'pdfSpecW', 'pdfNoW', 'pdfSmpW'];
+// Printed width (pt at 100%) of columns a..b, as Excel turns column widths into pixels. The template's default font is
+// SimSun 11, whose digit is 8px wide (not Calibri's 7): with it the default layout's C:AB comes to the 383.25pt and A:B to the
+// 18pt measured in Excel (see MATERIAL_LINE_WIDTH)
+const DIGIT_PX = 8;
+function colsPt(sheet, [a, b]) {
+  let t = 0;
+  for (const m of (sheet.match(/<cols>([\s\S]*?)<\/cols>/) || ['', ''])[1].matchAll(/<col\b[^>]*\/>/g)) {
+    const at = k => +(m[0].match(new RegExp(`\\b${k}="([^"]*)"`)) || [])[1];
+    for (let i = Math.max(at('min'), colNum(a)); i <= Math.min(at('max'), colNum(b)); i++) t += Math.trunc((256 * at('width') + Math.trunc(128 / DIGIT_PX)) / 256 * DIGIT_PX) * 0.75;
   }
-  if (changed.has('pdfMatFont')) w *= 12 / opt.pdfMatFont;
-  return Math.round(w);
+  return t;
+}
+// The same sum as MATERIAL_LINE_WIDTH, from the column widths as laid out: text area C:AB less A:B and the cell padding, at
+// the material font size (with the default layout and font this comes to MATERIAL_LINE_WIDTH)
+async function materialLineWidth(opt) {
+  const sheet = equalizeLengthTables(await templateSheet(TEMPLATES.oqc), opt);
+  return Math.round((colsPt(sheet, ['C', 'AB']) - colsPt(sheet, ['A', 'B']) - 3) / opt.pdfMatFont * 1000);
 }
 
 
@@ -739,7 +742,7 @@ async function buildOqcWorkbook(pages, itemList, kind = 'oqc', pdfOptions = {}) 
   const given = cleanPdfOptions(pdfOptions);
   const opt = { ...PDF_DEFAULT, ...given };
   const changed = new Set(Object.keys(given).filter(k => given[k] !== PDF_DEFAULT[k]));
-  const matWidth = await materialLineWidth(opt, changed);
+  const matWidth = await materialLineWidth(opt);
   const build = { opt, changed, matWidth };
   // Column widths changed: the page scale is worked out from the default layout's width (see stackPages)
   const refWidth = async tpl => WIDTH_KEYS.some(k => changed.has(k)) ? sheetWidthPt(equalizeLengthTables(await templateSheet(tpl), PDF_DEFAULT)) : 0;

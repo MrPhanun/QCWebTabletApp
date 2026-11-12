@@ -11,12 +11,11 @@ const PDF_DEFS = [
   ['pdfResFont', 9, 6, 14],         // Length Check result row (OK / NG)
   ['pdfItemResFont', 10.5, 7, 16],  // Material / Inspection point results
   ['pdfFootFont', 10.5, 7, 16],     // Remarks, Total determination, Checked by, Inspector
-  ['pdfPosW', 135, 100, 170],       // Length Position column width (% of the template's; taken from the samples)
+  ['pdfPosW', 135, 100, 180],       // Length Position column width (% of the template's; taken from the samples)
   ['pdfSpecW', 133, 90, 170],       // SPEC column width (% of the template's; taken from / given to Length Position)
-  // The next three take no width from other columns: the page scale shrinks instead, to keep one A4 page
+  // The next two take no width from other columns: the page scale shrinks instead, to keep one A4 page
   ['pdfNoW', 100, 50, 200],         // № column of both Length Check tables (A:B, Y:Z), % of the template's
-  ['pdfSmpW', 100, 60, 170],        // sample columns ① .. ⑤ (both tables), % of their width
-  ['pdfResW', 100, 60, 170],        // Result boxes of Material check and Inspection point (AC:AE, AT:AV), % of their width
+  ['pdfSmpW', 100, 60, 170],        // sample columns ① .. ⑤ (both tables, all alike); the two Result boxes follow them
   ['pdfLenRowH', 22.5, 15, 36]      // Length Check row height (pt); the page scale shrinks to keep one A4 page
 ];
 const PDF_DEFAULT = Object.fromEntries(PDF_DEFS.map(([k, d]) => [k, d]));

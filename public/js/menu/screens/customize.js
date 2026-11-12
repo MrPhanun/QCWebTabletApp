@@ -54,11 +54,10 @@ const UI_GROUPS = [
     ['pdfResFont', 'cz.pdfResFont', 'num', 9, 6, 14, 0.5, 'pt'],
     ['pdfItemResFont', 'cz.pdfItemResFont', 'num', 10.5, 7, 16, 0.5, 'pt'],
     ['pdfFootFont', 'cz.pdfFootFont', 'num', 10.5, 7, 16, 0.5, 'pt'],
-    ['pdfPosW', 'cz.pdfPosW', 'num', 135, 100, 170, 1, '%'],
+    ['pdfPosW', 'cz.pdfPosW', 'num', 135, 100, 180, 1, '%'],
     ['pdfSpecW', 'cz.pdfSpecW', 'num', 133, 90, 170, 1, '%'],
     ['pdfNoW', 'cz.pdfNoW', 'num', 100, 50, 200, 1, '%'],
     ['pdfSmpW', 'cz.pdfSmpW', 'num', 100, 60, 170, 1, '%'],
-    ['pdfResW', 'cz.pdfResW', 'num', 100, 60, 170, 1, '%'],
     ['pdfLenRowH', 'cz.pdfLenRowH', 'num', 22.5, 15, 36, 0.5, 'pt']
   ]}
 ];
