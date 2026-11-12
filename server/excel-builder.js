@@ -189,8 +189,19 @@ ${m[3]}`);
 // The two Length Check tables (left and right) get the same column widths: each part (position, SPEC, each sample) takes the average
 // of its two widths, shared out over that part's columns in proportion to what they were
 const POSITION_GROW = 1.35;
+const SPEC_GROW = 1.33;
 // Length Position: the same size as the samples (10), smaller when the name is too long for its box so that all of it shows
-const positionSize = t => Math.max(6, Math.min(10, Math.floor(10 * 17 / t.length * 2) / 2));
+// (at size 10 a box of width w — in column width units — holds about w x 1.05 characters)
+const positionSize = (t, width) => Math.max(6, Math.min(10, Math.floor(10 * width * 1.05 / t.length * 2) / 2));
+// Width of the columns a..b of the sheet (from its <cols>)
+function colsWidth(sheet, [a, b]) {
+  let t = 0;
+  for (const m of (sheet.match(/<cols>([\s\S]*?)<\/cols>/) || ['', ''])[1].matchAll(/<col\b[^>]*\/>/g)) {
+    const at = k => +(m[0].match(new RegExp(`\\b${k}="([^"]*)"`)) || [])[1];
+    for (let i = Math.max(at('min'), colNum(a)); i <= Math.min(at('max'), colNum(b)); i++) t += at('width');
+  }
+  return t;
+}
 function equalizeLengthTables(sheet) {
   const m = sheet.match(/<cols>([\s\S]*?)<\/cols>/);
   if (!m) return sheet;
@@ -224,6 +235,16 @@ function equalizeLengthTables(sheet) {
     const parts = side.samples.map(idx), target = parts.reduce((t, ix) => t + sum(ix), 0) / parts.length;
     for (const ix of parts) { const g = target / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * g * 1000) / 1000; }
   }
+  // SPEC is wider than Length Position: it grows by SPEC_GROW (column by column, the same on both sides, so the "100 ±" split stays
+  // in line) and Position gives up that width, so the samples keep theirs. On the right, Position's columns under the Material
+  // Result box (AC:AE) are left as they are (that box is matched to the Inspection Point result box below).
+  {
+    const idx = ([a, b]) => Array.from({ length: colNum(b) - colNum(a) + 1 }, (_, i) => colNum(a) + i);
+    const sum = ix => ix.reduce((t, i) => t + cols[i][1], 0);
+    const spec = idx(LEFT.spec), add = sum(spec) * (SPEC_GROW - 1);
+    for (const ix of [spec, idx(RIGHT.spec)]) for (const i of ix) cols[i][1] = Math.round(cols[i][1] * SPEC_GROW * 1000) / 1000;
+    for (const ix of [idx(LEFT.pos), idx([RIGHT.pos[0], 'AB'])]) { const f = (sum(ix) - add) / sum(ix); for (const i of ix) cols[i][1] = Math.round(cols[i][1] * f * 1000) / 1000; }
+  }
   // The Result box of 1) Material check (AC:AE) and of 3) Inspection point (AT:AV, the same columns as sample ⑤)
   // sit above this table but share its columns: match their width too (this can throw off their match with the
   // position/sample groups above, since AC:AE is also part of RIGHT.pos and AT:AV is also RIGHT.samples[4])
@@ -239,15 +260,36 @@ function equalizeLengthTables(sheet) {
 }
 
 // A material line is one cell per row (no wrapping, it would run on past the Result box): a line longer than the box goes
-// on under it, broken after a space / comma / semicolon where it can
-const MATERIAL_LINE_MAX = 58;
+// on under it, broken after a space / comma / semicolon where it can (else after a "+", e.g. "15mmX4+75mmX2+30mm+...").
+// The box width is measured in printed width, not a character count: text like "100mm+125mm" is much wider per
+// character than ordinary text and a count let it run under the Result box, where it was cut off.
+// Widths are Times New Roman's (1/1000 em); other characters (Khmer, ...) count as a wide letter.
+const CHAR_W = (() => {
+  const w = {};
+  const set = (chars, v) => { for (const ch of chars) w[ch] = v; };
+  set('0123456789', 500); set(' .,;:\'!|', 250); set('()[]-`', 333); set('/\\', 278); set('+=<>~', 564); set('*', 500); set('"', 408);
+  set('abcdeghknopquvxyz', 500); set('fjrt', 333); set('ilj', 278); set('s', 389); set('mw', 778); set('&', 778); set('%', 833); set('@#', 921);
+  set('ABCDEGHKNOQRUVXY', 722); set('FLPSTZ', 611); set('IJ', 389); set('MW', 944);
+  return w;
+})();
+const charW = ch => CHAR_W[ch] ?? 722;
+// The text area C:AB less, on the right, the same space as on the left (columns A:B, before the text): the text then
+// ends as far from the Result box as it starts from the box's left line. In Excel C:AB is 383.25pt and A:B 18pt, the text
+// 12pt Times New Roman: 383.25 - 18 - 2 x 1.5 (cell padding) = 362.25pt = 30190 / 1000 em (re-measure if the column widths change)
+const MATERIAL_LINE_WIDTH = 30190;
 function wrapLine(line) {
   const out = [];
   let rest = String(line);
-  while (rest.length > MATERIAL_LINE_MAX) {
-    const head = rest.slice(0, MATERIAL_LINE_MAX + 1);
-    const at = Math.max(head.lastIndexOf(' '), head.lastIndexOf(','), head.lastIndexOf(';'));
-    const cut = at > MATERIAL_LINE_MAX / 2 ? at + 1 : MATERIAL_LINE_MAX;
+  for (;;) {
+    // how many characters fit
+    let n = 0, w = 0;
+    while (n < rest.length && w + charW(rest[n]) <= MATERIAL_LINE_WIDTH) w += charW(rest[n++]);
+    if (n >= rest.length) break;
+    const head = rest.slice(0, n);
+    // a space just past the edge still lets the line end there (it is not printed); a "," ";" "+" must fit
+    let at = rest[n] === ' ' ? n : Math.max(head.lastIndexOf(' '), head.lastIndexOf(','), head.lastIndexOf(';'));
+    if (at <= n / 2) at = head.lastIndexOf('+');
+    const cut = at > n / 2 ? at + 1 : n;
     out.push(rest.slice(0, cut).trimEnd());
     rest = rest.slice(cut).trimStart();
   }
@@ -354,12 +396,13 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
     const res = (d.lengthResults || [])[t] || '';
     // ④⑤ not used (their results are "/"): one diagonal line over the whole ④⑤ block, as on the page
     const slash = Array.isArray(res) && res[3] === '/' && res[4] === '/';
+    const posWidth = colsWidth(sheet, side.pos);
     for (let i = 0; i < ROWS; i++) {
       const l = byNo.get(t * ROWS + i + 1);
       const r = FIRST_LEN_ROW + i;
       side.samples.forEach(([c1, c2]) => centerBox(c1, c2, r));
       if (!l) continue;
-      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: positionSize(String(l.position).trim()), font: 'Cambria' } : '');
+      set(`${side.pos[0]}${r}`, String(l.position ?? '').trim() ? { text: String(l.position).trim(), size: positionSize(String(l.position).trim(), posWidth), font: 'Cambria' } : '');
       sheet = setSpec(sheet, side, r, l.spec, ctx);
       side.samples.forEach(([c1], k) => set(`${c1}${r}`, exactNum((l.samples || [])[k])));
     }
