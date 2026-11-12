@@ -787,8 +787,40 @@ function renderOQC(panel, opts = {}) {
     } finally { $('oqcSave').disabled = !canSave; }
   }
 
+  // A record whose PDF is not printed yet takes each line's Range from the SPEC master again, so a Range corrected there
+  // after the record was filled in is used. Only lines whose Position and SPEC still match the master change; a printed
+  // record keeps the values it was printed with. Returns how many lines changed.
+  async function refreshRanges(r) {
+    const head = r.pages[0] || {};
+    if (r.pdfPrinted || !head.partNo) return 0;
+    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+    const saved = r.pages.flatMap((pg, p) => (pg.lengths || []).map(l => ({ pg, l, line: p * PER_PAGE + Number(l.no) })));
+    const same = (m, l) => m && norm(m.position) === norm(l.position) && norm(specText(m)) === norm(l.spec);
+    let candidates;
+    try {
+      const url = `/api/oqc/spec?partNo=${encodeURIComponent(head.partNo)}`;
+      const s = await api('GET', url);
+      candidates = s.choices ? await Promise.all(s.choices.map(c => api('GET', `${url}&specId=${c.id}`))) : [s];
+    } catch { return 0; }   // no SPEC for this Part No any more: keep what the record has
+    // The SPEC the record was filled from: the one whose lines match its Position + SPEC best
+    const byLine = s => new Map((s.lengths || []).map(m => [Number(m.line), m]));
+    const score = s => { const by = byLine(s); return saved.filter(({ l, line }) => same(by.get(line), l)).length; };
+    const by = byLine(candidates.reduce((a, b) => score(b) > score(a) ? b : a));
+    let n = 0;
+    for (const { pg, l, line } of saved) {
+      const m = by.get(line);
+      if (!same(m, l) || norm(m.range) === norm(l.range)) continue;
+      l.range = norm(m.range);
+      n++;
+      // that table's results are worked out again from the samples (writeNamed does so when none are saved)
+      if (Array.isArray(pg.lengthResults)) pg.lengthResults[Number(l.no) <= 11 ? 0 : 1] = null;
+    }
+    return n;
+  }
+
   async function loadRecord(id) {
     const r = await api('GET', `/api/oqc/records/${id}`);
+    const refreshed = await refreshRanges(r);
     pages = r.pages.map(snapFromNamed);
     formType = (r.pages[0] && r.pages[0].type) || '';
     setForm();
@@ -797,7 +829,8 @@ function renderOQC(panel, opts = {}) {
     prob = pages[0].prob;
     rec = { id: r.id, box: r.box, itemCode: r.itemCode, pos: r.pos };
     $('oqcShip').value = r.shipDate || '';
-    dirty = false;
+    dirty = refreshed > 0;   // Ranges taken from the SPEC master again: Save keeps them
+    r.refreshed = refreshed;
     clearMissing();
     showPages(); setStatus();
     clearScan();
@@ -822,7 +855,8 @@ function renderOQC(panel, opts = {}) {
       if (el) { el.readOnly = true; el.tabIndex = -1; el.classList.add('locked'); }
     });
     loadRecord(job.id).then(r => {
-      msg(t('o.openedRec', { id: r.id, lot: r.lot, box: r.box ? `, Box ${r.box}` : '', state: t(r.complete ? 'st.complete' : 'st.draft') }), 'ok');
+      msg(t('o.openedRec', { id: r.id, lot: r.lot, box: r.box ? `, Box ${r.box}` : '', state: t(r.complete ? 'st.complete' : 'st.draft') })
+        + (r.refreshed ? ' · ' + t('o.rangeRefreshed', { n: r.refreshed }) : ''), 'ok');
       if (job.check) showMissing();   // a draft: outline in red what is still to be filled in
     }).catch(err => msg(err.message));
   }
