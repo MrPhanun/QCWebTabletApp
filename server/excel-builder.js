@@ -143,6 +143,61 @@ function sizedStyle(ctx, s, size) {
   const out = xf.replace(/\s*fontId="\d+"/, '').replace(/\s*applyFont="[^"]*"/, '').replace(/<xf\b/, `<xf fontId="${fonts.length}" applyFont="1"`);
   return (ctx.cache[key] = addXf(ctx, out));
 }
+// Font size (pt) of style index s
+function styleFontSize(ctx, s) {
+  const xf = xfList(ctx.styles)[+s] || '';
+  const fonts = ctx.styles.match(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/)[1].match(/<font\b[^>]*\/>|<font\b[^>]*>[\s\S]*?<\/font>/g) || [];
+  const font = fonts[+((xf.match(/\bfontId="(\d+)"/) || [])[1] || 0)] || '';
+  return +((font.match(/<sz val="([\d.]+)"/) || [])[1] || 11);
+}
+// Customize UI column widths can make a box narrower than in the template (a wider Length Position takes width from the
+// columns that the SPOT CHECK, Probability, Inspection point, Result, Checked by and Inspector boxes also span): its text
+// then gets smaller by the same ratio, so it still fits. Every merged box outside the Length Check rows (30-41, which have
+// their own font settings) is compared with the default layout's widths (ctx.refCols); boxes as wide as before keep their size.
+const MIN_FIT_FONT = 6;
+function fitNarrowedBoxes(sheet, ctx) {
+  if (!ctx.refCols) return sheet;
+  const cur = [];
+  for (const m of ((sheet.match(/<cols>([\s\S]*?)<\/cols>/) || ['', ''])[1]).matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bwidth="([\d.]+)"/g)) {
+    for (let i = +m[1]; i <= Math.min(+m[2], LAST_COL); i++) cur[i] = +m[3];
+  }
+  const width = (w, a, b) => { let t = 0; for (let i = colNum(a); i <= colNum(b); i++) t += w[i] || 0; return t; };
+  const fit = size => Math.max(MIN_FIT_FONT, Math.floor(size * 2) / 2);
+  // The boxes: every merged box, and every text cell that is not in one: its text runs on over the empty cells to its right,
+  // so its box ends before the next cell with something in it (e.g. an Inspection point label, up to its Result)
+  const boxes = [...sheet.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)\d+"\/>/g)].map(([, c1, r1, c2]) => [c1, +r1, c2]);
+  const merged = new Set();
+  for (const m of sheet.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/g)) {
+    for (let r = +m[2]; r <= +m[4]; r++) for (let c = colNum(m[1]); c <= colNum(m[3]); c++) merged.add(`${c}:${r}`);
+  }
+  // (material text lines, in column C, have their own line width: matWidth; the rest of those rows is checked like any other)
+  const materialRows = new Set(Object.values(MATERIAL_ROWS).flat());
+  for (const [, r, body] of sheet.matchAll(/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
+    const filled = [...body.matchAll(/<c r="([A-Z]+)\d+"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/g)].filter(m => m[2] && /<v>|<is>/.test(m[2])).map(m => colNum(m[1]));
+    for (const c of filled) {
+      if (merged.has(`${c}:${r}`) || (c === colNum('C') && materialRows.has(+r))) continue;
+      // (a merged box stops the text too, even one whose value sits in the row above, like an item's Result)
+      let end = c;
+      while (end < LAST_COL && !filled.includes(end + 1) && !merged.has(`${end + 1}:${r}`)) end++;
+      if (end > c) boxes.push([colLetter(c), +r, colLetter(end)]);
+    }
+  }
+  for (const [c1, r1, c2] of boxes) {
+    if (r1 >= FIRST_LEN_ROW && r1 <= RESULT_ROW) continue;
+    const ref = width(ctx.refCols, c1, c2), ratio = ref ? width(cur, c1, c2) / ref : 1;
+    if (ratio >= 0.98) continue;
+    const tl = `${c1}${r1}`, cell = sheet.match(new RegExp(`<c r="${tl}"[^>]*?(?:/>|>[\\s\\S]*?</c>)`));
+    if (!cell || !/<v>|<is>/.test(cell[0])) continue;
+    // text written with its own size (inline runs): those sizes; otherwise the cell's font
+    if (/<rPr>[\s\S]*?<sz val=/.test(cell[0])) {
+      sheet = sheet.replace(cell[0], () => cell[0].replace(/<sz val="([\d.]+)"\/>/g, (m, v) => `<sz val="${fit(+v * ratio)}"/>`));
+    } else {
+      const s = styleOf(sheet, tl);
+      if (s !== undefined) sheet = useStyle(sheet, tl, sizedStyle(ctx, s, fit(styleFontSize(ctx, s) * ratio)));
+    }
+  }
+  return sheet;
+}
 // Style index s, centered, with its border plus one thin diagonal line from bottom-left to top-right
 function diagonalStyle(ctx, s, down = false) {
   ctx.cache = ctx.cache || {};
@@ -441,10 +496,12 @@ function fillOqcSheet(sheet, d, itemList, ctx, textBoxes = false) {
   // within column A's own width. Merging it for real lets the text center — and wrap — across the whole box.
   { const s = styleOf(sheet, 'A43'); if (s !== undefined) { sheet = addMerge(sheet, 'A43:AC43'); sheet = useStyle(sheet, 'A43', wrapCenteredStyle(ctx, s, 'top')); } }
   set('A43', d.remarks);
-  set('AD43', d.total);
+  // First Lot (textBoxes): the box is "Approved by" — the approver's name typed under "Approved" (totalNote), not the
+  // Total Determination, which that form always keeps as OK
+  set('AD43', textBoxes ? d.totalNote : d.total);
   set('AK43', d.checkedBy);
   set('AQ43', d.inspector);
-  return resizeOqcCells(sheet, ctx);
+  return fitNarrowedBoxes(resizeOqcCells(sheet, ctx), ctx);
 }
 
 // Customize UI › PDF / Excel: font sizes and the Length Check row height. Only values changed from the default are applied,
@@ -658,6 +715,14 @@ async function buildSheetWorkbook(tpl, pages, fill, opts = {}) {
   const sheetPath = partOf(relTag(sheetTag.match(/\br:id="([^"]+)"/)[1]));
   const relsPath = sheetPath.replace(/([^/]+)$/, '_rels/$1.rels');
   let sheet1 = await read(sheetPath);
+  // Column widths changed in Customize UI: the default layout's widths, so boxes made narrower can fit their text (fitNarrowedBoxes)
+  if (WIDTH_KEYS.some(k => ctx.changed.has(k))) {
+    ctx.refCols = [];
+    const def = equalizeLengthTables(sheet1, PDF_DEFAULT);
+    for (const m of ((def.match(/<cols>([\s\S]*?)<\/cols>/) || ['', ''])[1]).matchAll(/<col\b[^>]*\bmin="(\d+)"[^>]*\bmax="(\d+)"[^>]*\bwidth="([\d.]+)"/g)) {
+      for (let i = +m[1]; i <= Math.min(+m[2], LAST_COL); i++) ctx.refCols[i] = +m[3];
+    }
+  }
   const relsFile = zip.file(relsPath);
   let rels1 = relsFile ? await relsFile.async('string') : '';
   // A template without a drawing (OQC Data) gets an empty one, so shapes (the "not used" lines) can be added
