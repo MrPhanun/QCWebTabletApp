@@ -351,17 +351,23 @@ const CHAR_W = (() => {
   return w;
 })();
 const charW = ch => CHAR_W[ch] ?? 722;
+// Excel draws each character at a whole number of pixels (96 per inch) at the font's pixel size, so text prints wider than
+// its exact width: 11pt is a 15px font, where a digit (7.5px) takes 8px and a comma (3.75px) 4px. A line of part numbers
+// measured exactly ran ~6% past the box and its end was cut off under the Result column, so widths are counted the same
+// way: { ppem: font size in px, px: box width in px }
+const pxFit = (pt, boxPt) => ({ ppem: Math.round(pt * 96 / 72), px: boxPt * 96 / 72 });
+const charPx = (ch, ppem) => Math.round(charW(ch) * ppem / 1000);
 // The text area C:AB less, on the right, the same space as on the left (columns A:B, before the text): the text then
 // ends as far from the Result box as it starts from the box's left line. In Excel C:AB is 383.25pt and A:B 18pt, the text
-// 12pt Times New Roman: 383.25 - 18 - 2 x 1.5 (cell padding) = 362.25pt = 30190 / 1000 em (re-measure if the column widths change)
-const MATERIAL_LINE_WIDTH = 30190;
-function wrapLine(line, maxW = MATERIAL_LINE_WIDTH) {
+// 12pt Times New Roman: 383.25 - 18 - 2 x 1.5 (cell padding) = 362.25pt (re-measure if the column widths change)
+const MATERIAL_LINE_WIDTH = pxFit(12, 362.25);
+function wrapLine(line, fit = MATERIAL_LINE_WIDTH) {
   const out = [];
   let rest = String(line);
   for (;;) {
     // how many characters fit
     let n = 0, w = 0;
-    while (n < rest.length && w + charW(rest[n]) <= maxW) w += charW(rest[n++]);
+    while (n < rest.length && w + charPx(rest[n], fit.ppem) <= fit.px) w += charPx(rest[n++], fit.ppem);
     if (n >= rest.length) break;
     const head = rest.slice(0, n);
     // a space just past the edge still lets the line end there (it is not printed); a "," ";" "+" must fit
@@ -387,7 +393,7 @@ const makeContinuationPage = prev => ({ ...prev, material: { wire: '/', terminal
 // Returns the (possibly longer) pages array with material text re-split, and which "pageIndex:materialKey"
 // pairs are a continuation (so their Result stays blank there instead of showing "/" or repeating page 1's).
 const MAX_PAGES = 50;
-function splitMaterialOverflow(pages, maxW = MATERIAL_LINE_WIDTH) {
+function splitMaterialOverflow(pages, fit = MATERIAL_LINE_WIDTH) {
   const continued = new Set();
   pages = pages.map(d => ({ ...d, material: { ...(d.material || {}) } }));
   for (const k of Object.keys(MATERIAL_ROWS)) {
@@ -396,7 +402,7 @@ function splitMaterialOverflow(pages, maxW = MATERIAL_LINE_WIDTH) {
     while (p < pages.length) {
       const text = pages[p].material[k];
       if (!text || text === '/') break;
-      const lines = String(text).split(/\r?\n/).flatMap(l => wrapLine(l, maxW));
+      const lines = String(text).split(/\r?\n/).flatMap(l => wrapLine(l, fit));
       if (lines.length <= rows) break;
       pages[p].material[k] = lines.slice(0, rows).join('\n');
       const rest = lines.slice(rows).join('\n');
@@ -559,7 +565,7 @@ function colsPt(sheet, [a, b]) {
 // the material font size (with the default layout and font this comes to MATERIAL_LINE_WIDTH)
 async function materialLineWidth(opt) {
   const sheet = equalizeLengthTables(await templateSheet(TEMPLATES.oqc), opt);
-  return Math.round((colsPt(sheet, ['C', 'AB']) - colsPt(sheet, ['A', 'B']) - 3) / opt.pdfMatFont * 1000);
+  return pxFit(opt.pdfMatFont, colsPt(sheet, ['C', 'AB']) - colsPt(sheet, ['A', 'B']) - 3);
 }
 
 
