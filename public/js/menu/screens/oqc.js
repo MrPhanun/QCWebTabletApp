@@ -189,9 +189,11 @@ function renderOQC(panel, opts = {}) {
       if (on) { i.value = ''; i.classList.remove('ng'); }
       i.readOnly = on; i.tabIndex = on ? -1 : 0;
     }));
-    if (!on) return;
+    // a table with no length positions at all (usually the right one) gets no line
+    const filled = tr => tr.querySelector('[data-pos]').value.trim() || tr.querySelector('[data-spec]').value.trim();
+    if (!on || !rows.some(filled)) return;
     // the ④⑤ line runs on through the Result row (its ④⑤ boxes) to the last row; each row takes its share of the height
-    const lines = [...rows, ...table.querySelectorAll('tbody tr.sec')];
+    const lines =[...rows, ...table.querySelectorAll('tbody tr.sec')];
     const hs = lines.map(tr => tr.offsetHeight);
     const w = hs.every(h => h > 0) ? hs : hs.map(() => 1), total = w.reduce((a, b) => a + b, 0), cols = 5 - SAMPLE_COLS;
     let done = 0;
@@ -203,8 +205,7 @@ function renderOQC(panel, opts = {}) {
       });
     });
     // ... and the empty rows after the last length position: one line over ① .. ③ only, from the bottom-left of ① to the top-right
-    // of ③ (as on the printed sheet; a right table with no data at all gets none)
-    const filled = tr => tr.querySelector('[data-pos]').value.trim() || tr.querySelector('[data-spec]').value.trim();
+    // of ③ (as on the printed sheet)
     let first = rows.length;
     while (first > 0 && !filled(rows[first - 1])) first--;
     if (first >= rows.length || (first === 0 && rows[0].querySelector('[data-pos]').dataset.pos !== '1')) return;

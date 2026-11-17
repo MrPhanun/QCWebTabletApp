@@ -599,6 +599,8 @@ function addMaterialLines(drawing, d, itemList = []) {
   [LEFT, RIGHT].forEach((side, t) => {
     const res = (d.lengthResults || [])[t];
     if (!(Array.isArray(res) && res[3] === '/' && res[4] === '/')) return;
+    // a table with no length positions at all (usually the right one) gets no line
+    if (!(d.lengths || []).some(l => { const n = Number(l.no); return n > t * ROWS && n <= (t + 1) * ROWS; })) return;
     drawing = showRedLine(drawing, anchors, `LengthLine${t + 1}`, 920 + t, `Not used length ${t + 1}`, `${side.samples[3][0]}${FIRST_LEN_ROW}:${side.samples[4][1]}${RESULT_ROW}`);
   });
   // Length Check with no more length positions: one thin line over the empty rows at the end of each table
