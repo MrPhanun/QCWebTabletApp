@@ -147,7 +147,6 @@ const STR = {
   'o.badge': ['{field}: {name} (ID {id})', '{field}៖ {name} (ID {id})'],
   'o.pageAdded': ['Page {n} added — copied from page {from} without the Length Check', 'បានបន្ថែមទំព័រ {n} — ចម្លងពីទំព័រ {from} ដោយគ្មានការត្រួតពិនិត្យប្រវែង'],
   'o.rangeRefreshed': ['Range of {n} line(s) updated from the SPEC master — Save to keep it', 'បានធ្វើបច្ចុប្បន្នភាព Range {n} ជួរ ពី SPEC master — ចុច រក្សាទុក ដើម្បីរក្សាវា'],
-  'o.pageAddedAuto': ['Page 2 added automatically — the material text was too long for one page', 'បានបន្ថែមទំព័រ ២ ដោយស្វ័យប្រវត្តិ — អត្ថបទសម្ភារៈវែងពេកសម្រាប់ទំព័រមួយ'],
   'o.removeT': ['Remove page {n}?', 'លុបទំព័រ {n}?'],
   'o.removeM': ['Everything on this page will be removed. The other pages stay.', 'អ្វីៗទាំងអស់នៅលើទំព័រនេះនឹងត្រូវលុប។ ទំព័រផ្សេងទៀតនៅដដែល។'],
   'o.pageRemoved': ['Page removed — {n} page{s} left', 'បានលុបទំព័រ — នៅសល់ {n} ទំព័រ'],
