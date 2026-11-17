@@ -18,6 +18,9 @@ async function pdfOptionsFor(session, body) {
 
 // Printer the PDF button sends to (override with "pdfPrinter" in config/<env>.json)
 const PDF_PRINTER = config.pdfPrinter || 'Microsoft Print to PDF';
+// Stored files made before this server started may come from older builder code still running at the time (a print between
+// a code change and the restart is newer than excel-builder.js yet made the old way): those are made again
+const SERVER_START = Date.now();
 // File name: OQC_<dd-mm-yyyy>.pdf (today)
 const pdfBase = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `OQC_${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`; };
 
@@ -102,7 +105,7 @@ async function handleRecordExport(req, res, session, id, kind) {
     const stale = f => { try { return fs.statSync(file).mtimeMs < fs.statSync(f).mtimeMs; } catch { return false; } };
     // (and one made before the PDF / Excel sizes in Customize UI were last saved)
     const ui = await loadUiSettings();
-    const outdated = [path.join(__dirname, '..', 'excel-builder.js'), ...fs.readdirSync(path.join(__dirname, '..', '..', 'templates')).map(n => path.join(__dirname, '..', '..', 'templates', n))].some(stale)
+    const outdated = (fs.existsSync(file) && fs.statSync(file).mtimeMs < SERVER_START) || [path.join(__dirname, '..', 'excel-builder.js'), ...fs.readdirSync(path.join(__dirname, '..', '..', 'templates')).map(n => path.join(__dirname, '..', '..', 'templates', n))].some(stale)
       || !!(ui.updatedAt && fs.existsSync(file) && fs.statSync(file).mtimeMs < new Date(ui.updatedAt).getTime());
     if (rec.printed && fs.existsSync(file) && !outdated) return sendFile(res, fs.readFileSync(file), name, type);
 

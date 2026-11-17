@@ -177,8 +177,8 @@ function renderOQC(panel, opts = {}) {
     slashUnused(table);
     return cols;
   }
-  // Sample: ④⑤ are not measured: they are cleared, locked and struck out with one diagonal line, from the top-right of ⑤ to the
-  // bottom-left of ④, like on paper. Each cell draws its piece of the line in %, so it stays straight at any size, including the printed sheet.
+  // Sample: ④⑤ are not measured: they are cleared and locked (left blank, no line). Below the last length position one line goes over
+  // ① .. ③ of the empty rows. Each cell draws its piece of the line in %, so it stays straight at any size, including the printed sheet.
   function slashUnused(table) {
     table.querySelectorAll('svg.slash').forEach(x => x.remove());
     const on = isSample(table);
@@ -189,15 +189,19 @@ function renderOQC(panel, opts = {}) {
       i.readOnly = on; i.tabIndex = on ? -1 : 0;
     }));
     if (!on) return;
-    // the line runs on through the Result row (its ④⑤ boxes) to the last row; each row takes its share of the height
-    const lines = [...rows, ...table.querySelectorAll('tbody tr.sec')];
-    const hs = lines.map(tr => tr.offsetHeight);
-    const w = hs.every(h => h > 0) ? hs : hs.map(() => 1), total = w.reduce((a, b) => a + b, 0), cols = 5 - SAMPLE_COLS;
+    // ④⑤ stay blank (no line through them); the only line is over the empty rows after the last length position: one line over ① .. ③ only, from the bottom-left of ① to the top-right
+    // of ③ (as on the printed sheet; a right table with no data at all gets none)
+    const filled = tr => tr.querySelector('[data-pos]').value.trim() || tr.querySelector('[data-spec]').value.trim();
+    let first = rows.length;
+    while (first > 0 && !filled(rows[first - 1])) first--;
+    if (first >= rows.length || (first === 0 && rows[0].querySelector('[data-pos]').dataset.pos !== '1')) return;
+    const empty = rows.slice(first), eh = empty.map(tr => tr.offsetHeight);
+    const ew = eh.every(h => h > 0) ? eh : eh.map(() => 1), etotal = ew.reduce((a, b) => a + b, 0);
     let done = 0;
-    lines.forEach((tr, r) => {
-      const y0 = done / total, y1 = (done += w[r]) / total;
-      [...tr.querySelectorAll('td.smp, td.smp-res')].slice(SAMPLE_COLS).forEach((td, c) => {
-        const x = y => ((cols - cols * y - c) * 100).toFixed(2) + '%';
+    empty.forEach((tr, r) => {
+      const y0 = done / etotal, y1 = (done += ew[r]) / etotal;
+      [...tr.querySelectorAll('td.smp')].slice(0, SAMPLE_COLS).forEach((td, c) => {
+        const x = y => ((SAMPLE_COLS - SAMPLE_COLS * y - c) * 100).toFixed(2) + '%';
         td.insertAdjacentHTML('beforeend', `<svg class="slash" aria-hidden="true"><line x1="${x(y0)}" y1="0" x2="${x(y1)}" y2="100%"/></svg>`);
       });
     });

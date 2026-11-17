@@ -596,11 +596,7 @@ function addMaterialLines(drawing, d, itemList = []) {
     if (ITEM_ROWS[i] && (d.items || {})[en] === '/') anchors.push(redLine(930 + i, `Not used item ${i + 1}`, `AT${ITEM_ROWS[i]}:AV${ITEM_ROWS[i] + 1}`));
   });
   // Length Check ④⑤ not used ("/" results): one thin black line over the whole ④⑤ block (no thin diagonal under it)
-  [LEFT, RIGHT].forEach((side, t) => {
-    const res = (d.lengthResults || [])[t];
-    if (!(Array.isArray(res) && res[3] === '/' && res[4] === '/')) return;
-    drawing = showRedLine(drawing, anchors, `LengthLine${t + 1}`, 920 + t, `Not used length ${t + 1}`, `${side.samples[3][0]}${FIRST_LEN_ROW}:${side.samples[4][1]}${RESULT_ROW}`);
-  });
+  // (no longer drawn: on a Sample record ④⑤ are just left blank, and the only line is the one over the empty rows below)
   // Length Check with no more length positions: one thin line over the empty rows at the end of each table
   const used = new Set((d.lengths || []).map(l => Number(l.no)));
   [LEFT, RIGHT].forEach((side, t) => {
@@ -608,7 +604,9 @@ function addMaterialLines(drawing, d, itemList = []) {
     while (first > 0 && !used.has(t * ROWS + first)) first--;   // first = number of rows up to the last used one
     if (first >= ROWS) return;
     if (first === 0 && t > 0) return;   // the right table has no data at all: no line over it, only the left table's line
-    anchors.push(redLine(940 + t, `No more length ${t + 1}`, `${side.samples[0][0]}${FIRST_LEN_ROW + first}:${side.samples[4][1]}${FIRST_LEN_ROW + ROWS - 1}`));
+    // Sample (④⑤ not used, already struck out by their own line): this line covers ① .. ③ only, so the two don't cross
+    const res = (d.lengthResults || [])[t], last = Array.isArray(res) && res[3] === '/' && res[4] === '/' ? 2 : 4;
+    anchors.push(redLine(940 + t, `No more length ${t + 1}`, `${side.samples[0][0]}${FIRST_LEN_ROW + first}:${side.samples[last][1]}${FIRST_LEN_ROW + ROWS - 1}`));
   });
   return anchors.length ? drawing.replace('</xdr:wsDr>', anchors.join('') + '</xdr:wsDr>') : drawing;
 }
