@@ -596,7 +596,11 @@ function addMaterialLines(drawing, d, itemList = []) {
     if (ITEM_ROWS[i] && (d.items || {})[en] === '/') anchors.push(redLine(930 + i, `Not used item ${i + 1}`, `AT${ITEM_ROWS[i]}:AV${ITEM_ROWS[i] + 1}`));
   });
   // Length Check ④⑤ not used ("/" results): one thin black line over the whole ④⑤ block (no thin diagonal under it)
-  // (no longer drawn: on a Sample record ④⑤ are just left blank, and the only line is the one over the empty rows below)
+  [LEFT, RIGHT].forEach((side, t) => {
+    const res = (d.lengthResults || [])[t];
+    if (!(Array.isArray(res) && res[3] === '/' && res[4] === '/')) return;
+    drawing = showRedLine(drawing, anchors, `LengthLine${t + 1}`, 920 + t, `Not used length ${t + 1}`, `${side.samples[3][0]}${FIRST_LEN_ROW}:${side.samples[4][1]}${RESULT_ROW}`);
+  });
   // Length Check with no more length positions: one thin line over the empty rows at the end of each table
   const used = new Set((d.lengths || []).map(l => Number(l.no)));
   [LEFT, RIGHT].forEach((side, t) => {
